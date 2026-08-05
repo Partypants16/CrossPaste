@@ -1,0 +1,55 @@
+# Production deployment: Caddy is the only container with published ports. The app
+# container is reachable only through the internal Docker network, so nothing needs a
+# public port opened, a public domain, or port forwarding on your router.
+#
+# Usage:
+#   cp .env.example .env      # then edit .env
+#   docker compose up -d
+#
+# For a development variant that also exposes the app directly on APP_PORT (bypassing
+# Caddy, useful for quick local testing without trusting any certificate), see
+# compose.dev.yaml and the README's "Development mode" section.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: crosspaste-app:latest
+    container_name: crosspaste-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    networks:
+      - crosspaste_net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + (process.env.APP_PORT || 3000) + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: crosspaste-caddy
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/data:/data
+      - ./caddy/config:/config
+    networks:
+      - crosspaste_net
+
+networks:
+  crosspaste_net:
+    driver: bridge

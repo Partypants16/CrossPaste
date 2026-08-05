@@ -1,0 +1,28 @@
+# Never bake local dependencies, runtime data, or secrets into the image.
+node_modules
+npm-debug.log
+
+# Runtime data must live on a bind mount / volume outside the image, never inside it.
+data
+backups
+*.db
+*.db-wal
+*.db-shm
+
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+.dockerignore
+.vscode
+.idea
+
+tests
+coverage
+
+*.log
+
+caddy/data
+caddy/config

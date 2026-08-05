@@ -1,0 +1,22 @@
+# CrossPaste reverse proxy.
+#
+# Plain HTTP on :80 always works, for any hostname or LAN IP address — CrossPaste must
+# never require HTTPS to load. The named internal hostname is additionally served over
+# HTTPS using Caddy's internal (self-signed) certificate authority, purely so that
+# browsers treat the page as a secure context and allow the dedicated clipboard buttons
+# to use the full Clipboard API. See README.md "Configuring internal HTTPS" for how to
+# trust that certificate on each device.
+{
+	auto_https disable_redirects
+}
+
+:80 {
+	encode gzip
+	reverse_proxy app:3000
+}
+
+{$INTERNAL_HOSTNAME:crosspaste.home}:443 {
+	tls internal
+	encode gzip
+	reverse_proxy app:3000
+}

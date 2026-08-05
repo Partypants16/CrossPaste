@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CrossPaste — Access Token Required</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles/main.css" />
+</head>
+<body class="access-body">
+  <main class="access-card">
+    <h1>CrossPaste</h1>
+    <p>This server requires a shared access token before the clipboard can be opened.</p>
+    <form id="access-form" novalidate>
+      <label for="access-token">Access token</label>
+      <input type="password" id="access-token" name="token" autocomplete="off" required />
+      <button type="submit" class="button">Enter</button>
+    </form>
+    <p id="access-error" class="inline-message inline-message--error" hidden role="alert"></p>
+  </main>
+  <script type="module" src="/scripts/access.js"></script>
+</body>
+</html>

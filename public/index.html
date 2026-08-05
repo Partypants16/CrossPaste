@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>CrossPaste</title>
+  <meta name="description" content="A shared clipboard for moving text and images between your own devices." />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles/main.css" />
+</head>
+<body>
+  <a class="skip-link" href="#editor">Skip to text editor</a>
+
+  <header class="app-header">
+    <div class="app-header__identity">
+      <span class="app-header__logo" aria-hidden="true">CP</span>
+      <h1 class="app-header__title">CrossPaste</h1>
+    </div>
+
+    <div class="app-header__status" role="status" aria-live="polite" id="status-region">
+      <span class="status-pill" id="connection-status" data-state="connecting">
+        <span class="status-pill__dot" aria-hidden="true"></span>
+        <span id="connection-status-text">Connecting…</span>
+      </span>
+      <span class="status-pill" id="save-status" data-state="idle">
+        <span class="status-pill__dot" aria-hidden="true"></span>
+        <span id="save-status-text">Loading…</span>
+      </span>
+      <span class="app-header__updated" id="last-updated">Last updated: —</span>
+    </div>
+
+    <button type="button" class="button button--ghost" id="refresh-button" title="Reload the latest saved content">
+      <span aria-hidden="true">⟲</span> Refresh
+    </button>
+  </header>
+
+  <main class="workspace">
+    <section class="panel text-panel" aria-labelledby="text-panel-heading">
+      <h2 class="visually-hidden" id="text-panel-heading">Shared text</h2>
+
+      <div class="toolbar" role="toolbar" aria-label="Text formatting">
+        <button type="button" class="toolbar-button" data-action="paste-text" title="Paste from system clipboard" aria-label="Paste text">
+          <span aria-hidden="true">📋</span><span class="toolbar-button__label">Paste</span>
+        </button>
+        <button type="button" class="toolbar-button" data-action="copy-text" title="Copy shared text to clipboard" aria-label="Copy text">
+          <span aria-hidden="true">⧉</span><span class="toolbar-button__label">Copy</span>
+        </button>
+
+        <span class="toolbar-separator" role="separator" aria-orientation="vertical"></span>
+
+        <button type="button" class="toolbar-button" data-command="bold" title="Bold (Ctrl+B)" aria-label="Bold">
+          <strong aria-hidden="true">B</strong>
+        </button>
+        <button type="button" class="toolbar-button" data-command="italic" title="Italic (Ctrl+I)" aria-label="Italic">
+          <em aria-hidden="true">I</em>
+        </button>
+        <button type="button" class="toolbar-button" data-command="underline" title="Underline (Ctrl+U)" aria-label="Underline">
+          <span aria-hidden="true" style="text-decoration: underline;">U</span>
+        </button>
+        <button type="button" class="toolbar-button" data-command="strikeThrough" title="Strikethrough" aria-label="Strikethrough">
+          <span aria-hidden="true" style="text-decoration: line-through;">S</span>
+        </button>
+
+        <span class="toolbar-separator" role="separator" aria-orientation="vertical"></span>
+
+        <button type="button" class="toolbar-button" data-command="heading" title="Toggle heading" aria-label="Heading">
+          <span aria-hidden="true">H</span>
+        </button>
+        <button type="button" class="toolbar-button" data-command="insertOrderedList" title="Numbered list" aria-label="Ordered list">
+          <span aria-hidden="true">1.</span>
+        </button>
+        <button type="button" class="toolbar-button" data-command="insertUnorderedList" title="Bulleted list" aria-label="Unordered list">
+          <span aria-hidden="true">•</span>
+        </button>
+        <button type="button" class="toolbar-button" data-command="createLink" title="Insert link" aria-label="Insert link">
+          <span aria-hidden="true">🔗</span>
+        </button>
+        <button type="button" class="toolbar-button" data-command="removeFormat" title="Remove formatting" aria-label="Remove formatting">
+          <span aria-hidden="true">Tx</span>
+        </button>
+
+        <span class="toolbar-separator" role="separator" aria-orientation="vertical"></span>
+
+        <button type="button" class="toolbar-button toolbar-button--danger" data-action="clear-text" title="Clear the shared text" aria-label="Clear text">
+          <span aria-hidden="true">🗑</span><span class="toolbar-button__label">Clear</span>
+        </button>
+      </div>
+
+      <div id="paste-fallback-message" class="inline-message" hidden role="note"></div>
+      <div id="copy-fallback-message" class="inline-message" hidden role="note"></div>
+
+      <div
+        id="editor"
+        class="editor"
+        contenteditable="true"
+        role="textbox"
+        aria-multiline="true"
+        aria-label="Shared clipboard text"
+        tabindex="0"
+        spellcheck="true"
+      ></div>
+
+      <div class="editor-footer">
+        <span id="char-counter" class="char-counter">0 / 500,000 characters</span>
+        <div id="limit-warning" class="inline-message inline-message--warning" hidden role="alert"></div>
+      </div>
+
+      <div id="conflict-panel" class="conflict-panel" hidden role="alertdialog" aria-labelledby="conflict-title" aria-describedby="conflict-description">
+        <h3 id="conflict-title">Another device changed the text</h3>
+        <p id="conflict-description">
+          Someone saved a newer version while you were editing. Choose how to resolve this.
+        </p>
+        <div class="conflict-panel__actions">
+          <button type="button" class="button" id="conflict-keep-local">Keep My Local Version</button>
+          <button type="button" class="button button--secondary" id="conflict-load-server">Load Server Version</button>
+          <button type="button" class="button button--ghost" id="conflict-copy-local">Copy My Unsaved Version</button>
+        </div>
+      </div>
+
+      <div id="recovery-panel" class="conflict-panel" hidden role="alertdialog" aria-labelledby="recovery-title" aria-describedby="recovery-description">
+        <h3 id="recovery-title">Restore unsaved text?</h3>
+        <p id="recovery-description">
+          This browser has unsaved text from a previous session that was never confirmed as saved.
+        </p>
+        <div class="conflict-panel__actions">
+          <button type="button" class="button" id="recovery-restore">Restore Local Copy</button>
+          <button type="button" class="button button--ghost" id="recovery-discard">Discard It</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="workspace-divider" role="separator" aria-orientation="vertical"></div>
+
+    <section class="panel image-panel" aria-labelledby="image-panel-heading">
+      <h2 class="visually-hidden" id="image-panel-heading">Shared images</h2>
+
+      <div class="toolbar toolbar--wrap" role="toolbar" aria-label="Image actions">
+        <button type="button" class="toolbar-button" id="paste-image-button" title="Paste an image from the system clipboard" aria-label="Paste image">
+          <span aria-hidden="true">📋</span><span class="toolbar-button__label">Paste Image</span>
+        </button>
+        <label class="toolbar-button toolbar-button--file" for="image-file-input">
+          <span aria-hidden="true">⬆</span><span class="toolbar-button__label">Upload Image</span>
+        </label>
+        <input type="file" id="image-file-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden aria-label="Choose an image file to upload" />
+        <button type="button" class="toolbar-button" id="copy-image-button" title="Copy the selected image" aria-label="Copy selected image" disabled>
+          <span aria-hidden="true">⧉</span><span class="toolbar-button__label">Copy Selected</span>
+        </button>
+        <button type="button" class="toolbar-button" id="download-image-button" title="Download the selected image" aria-label="Download selected image" disabled>
+          <span aria-hidden="true">⬇</span><span class="toolbar-button__label">Download</span>
+        </button>
+        <button type="button" class="toolbar-button toolbar-button--danger" id="delete-image-button" title="Delete the selected image" aria-label="Delete selected image" disabled>
+          <span aria-hidden="true">🗑</span><span class="toolbar-button__label">Delete</span>
+        </button>
+      </div>
+
+      <p id="image-count-status" class="image-count-status">0 of 10 images stored</p>
+      <div id="image-limit-message" class="inline-message inline-message--warning" hidden role="alert"></div>
+      <div id="image-error-message" class="inline-message inline-message--error" hidden role="alert"></div>
+
+      <div id="image-dropzone" class="image-dropzone">
+        <ul id="image-grid" class="image-grid" aria-label="Stored images"></ul>
+        <p id="image-empty-state" class="image-empty-state">No images yet. Paste, upload, or drag one here.</p>
+      </div>
+
+      <div id="delete-image-panel" class="conflict-panel" hidden role="alertdialog" aria-labelledby="delete-image-title">
+        <h3 id="delete-image-title">Delete this image?</h3>
+        <p>This removes the image for every device using CrossPaste. This cannot be undone.</p>
+        <div class="conflict-panel__actions">
+          <button type="button" class="button button--danger" id="delete-image-confirm">Delete</button>
+          <button type="button" class="button button--ghost" id="delete-image-cancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="clear-text-panel" class="conflict-panel" hidden role="alertdialog" aria-labelledby="clear-text-title">
+    <h3 id="clear-text-title">Clear the shared text?</h3>
+    <p>This clears the text for every device using CrossPaste. This cannot be undone.</p>
+    <div class="conflict-panel__actions">
+      <button type="button" class="button button--danger" id="clear-text-confirm">Clear</button>
+      <button type="button" class="button button--ghost" id="clear-text-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <div id="modal-backdrop" class="modal-backdrop" hidden></div>
+
+  <div id="announcer" class="visually-hidden" role="status" aria-live="polite"></div>
+
+  <script type="module" src="/scripts/app.js"></script>
+</body>
+</html>

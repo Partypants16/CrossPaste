@@ -1,0 +1,11 @@
+# Optional development overlay: exposes the app container directly on APP_PORT so you
+# can test without Caddy or any trusted certificate. Do not use this on a machine
+# reachable beyond your own workstation/LAN test setup without also reviewing exposure.
+#
+# Usage:
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d
+
+services:
+  app:
+    ports:
+      - "${APP_PORT:-3000}:3000"

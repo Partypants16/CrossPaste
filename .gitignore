@@ -1,0 +1,41 @@
+# Dependencies are reinstalled from package-lock.json; never commit them.
+node_modules/
+
+# Real environment configuration contains this deployment's settings and, if the
+# optional access token is used, a secret. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Runtime data: the shared clipboard database and every uploaded image/thumbnail.
+# This is private user content generated at runtime, not source code, and must
+# never end up in a public repository.
+data/*
+!data/.gitkeep
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Backup archives contain a full copy of the runtime data above.
+backups/
+*.tar.gz
+
+# Caddy's internal certificate authority key and issued certificates.
+caddy/data/*
+!caddy/data/.gitkeep
+caddy/config/*
+!caddy/config/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test coverage output
+coverage/
