@@ -14,6 +14,7 @@ export async function setupTestEnvironment(overrides = {}) {
   process.env.DATA_DIRECTORY = tempDir;
   process.env.UPLOAD_DIRECTORY = path.join(tempDir, 'uploads');
   process.env.THUMBNAIL_DIRECTORY = path.join(tempDir, 'thumbnails');
+  process.env.FILES_DIRECTORY = path.join(tempDir, 'files');
   process.env.LOG_LEVEL = 'error';
   process.env.OPTIONAL_ACCESS_TOKEN = '';
   process.env.CONTENT_EXPIRY_HOURS = '0';

@@ -7,6 +7,7 @@ import {
   ImageLimitReachedError,
   ImageNotFoundError,
 } from '../services/image-service.js';
+import { FileTooLargeError, FileLimitReachedError, FileNotFoundError } from '../services/file-service.js';
 
 const ERROR_STATUS_MAP = new Map([
   [ValidationError, 400],
@@ -16,6 +17,9 @@ const ERROR_STATUS_MAP = new Map([
   [ImageTooLargeError, 413],
   [ImageLimitReachedError, 409],
   [ImageNotFoundError, 404],
+  [FileTooLargeError, 413],
+  [FileLimitReachedError, 409],
+  [FileNotFoundError, 404],
 ]);
 
 function respond(res, status, code, message, extra) {
@@ -41,6 +45,15 @@ export function errorHandler(error, req, res, _next) {
       if (error instanceof UnsupportedImageTypeError) {
         return respond(res, status, 'UNSUPPORTED_IMAGE_TYPE', error.message);
       }
+      if (error instanceof FileTooLargeError) {
+        return respond(res, status, 'FILE_TOO_LARGE', error.message);
+      }
+      if (error instanceof FileLimitReachedError) {
+        return respond(res, status, 'FILE_LIMIT_REACHED', error.message);
+      }
+      if (error instanceof FileNotFoundError) {
+        return respond(res, status, 'FILE_NOT_FOUND', error.message);
+      }
       return respond(res, status, error.name.toUpperCase(), error.message);
     }
   }
@@ -50,7 +63,13 @@ export function errorHandler(error, req, res, _next) {
   }
 
   if (error?.code === 'LIMIT_FILE_SIZE') {
-    return respond(res, 413, 'IMAGE_TOO_LARGE', 'Image exceeds the configured size limit.');
+    const isFileUpload = req.path === '/files' || error.field === 'file';
+    return respond(
+      res,
+      413,
+      isFileUpload ? 'FILE_TOO_LARGE' : 'IMAGE_TOO_LARGE',
+      `${isFileUpload ? 'File' : 'Image'} exceeds the configured size limit.`
+    );
   }
 
   logger.error('Unhandled server error', {

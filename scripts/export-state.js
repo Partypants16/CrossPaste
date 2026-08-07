@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Exports the current clipboard text and every stored image (files + metadata) into a
-// self-contained folder that import-state.js can later restore from.
+// Exports the current clipboard text and every stored image and shared file
+// (stored data + metadata) into a self-contained folder that import-state.js can
+// later restore from.
 // Usage: node scripts/export-state.js [destination-directory]
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import { config } from '../server/config.js';
 import { openDatabase, closeDatabase } from '../server/database.js';
 import { getClipboardState } from '../server/services/clipboard-service.js';
 import { listImages } from '../server/services/image-service.js';
+import { listFiles, getFileRowById } from '../server/services/file-service.js';
 
 async function main() {
   await openDatabase();
@@ -33,12 +35,28 @@ async function main() {
     }
   }
 
+  const fileList = listFiles();
+  const exportFiles = await Promise.all(fileList.map(async (file) => {
+    const row = getFileRowById(file.id);
+    const storedName = row.stored_filename;
+    const dataBase64 = (await fs.readFile(path.join(config.filesDirectory, storedName))).toString('base64');
+    return {
+      id: file.id,
+      storedFilename: storedName,
+      originalFilename: row.original_filename,
+      mimeType: row.mime_type,
+      sizeBytes: row.size_bytes,
+      createdAt: row.created_at,
+      contentBase64: dataBase64
+    };
+  }));
+
   await fs.writeFile(
-    path.join(destination, 'manifest.json'),
-    JSON.stringify({ exportedAt: new Date().toISOString(), clipboard, images }, null, 2)
+    path.join(destination, 'state.json'),
+    JSON.stringify({ files: exportFiles }, null, 2)
   );
 
-  console.log(`Exported clipboard state and ${images.length} image(s) to: ${destination}`);
+  console.log(`Exported clipboard state, ${images.length} image(s), and ${fileList.length} file(s) to: ${destination}`);
 }
 
 main()

@@ -18,6 +18,7 @@ test('openDatabase creates the data directory and initialises the schema', async
 
   assert.ok(tables.includes('clipboard'));
   assert.ok(tables.includes('images'));
+  assert.ok(tables.includes('files'));
   assert.ok(tables.includes('schema_migrations'));
 
   const clipboardRows = db.prepare('SELECT * FROM clipboard').all();
@@ -26,6 +27,7 @@ test('openDatabase creates the data directory and initialises the schema', async
 
   const appliedMigrations = db.prepare('SELECT id FROM schema_migrations').all().map((row) => row.id);
   assert.ok(appliedMigrations.includes('001-initial.sql'));
+  assert.ok(appliedMigrations.includes('002-files.sql'));
 });
 
 test('re-running migrations on an existing database does not duplicate the clipboard row', async () => {

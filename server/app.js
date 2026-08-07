@@ -9,6 +9,7 @@ import { healthRouter } from './routes/health.js';
 import { stateRouter } from './routes/state.js';
 import { clipboardRouter } from './routes/clipboard.js';
 import { imagesRouter } from './routes/images.js';
+import { filesRouter } from './routes/files.js';
 import { eventsRouter } from './routes/events.js';
 import { accessRouter } from './routes/access.js';
 
@@ -38,6 +39,7 @@ export async function createApp() {
     eventsRouter
   );
   app.use('/api', imagesRouter);
+  app.use('/api', filesRouter);
 
   app.use(
     express.static(PUBLIC_DIRECTORY, {

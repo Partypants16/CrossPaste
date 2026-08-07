@@ -4,6 +4,7 @@ import { logger } from '../utilities/logger.js';
 import { getDatabase } from '../database.js';
 import { deleteFileIfExists } from '../utilities/files.js';
 import { expireClipboardIfOlderThan } from './clipboard-service.js';
+import { expireOldFiles } from './file-service.js';
 import { broadcast } from './realtime-service.js';
 
 const CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
@@ -47,6 +48,7 @@ export async function runExpiryCleanup() {
 
     const expiredClipboard = expireClipboardIfOlderThan(cutoff);
     const expiredImageCount = await expireOldImages(cutoff);
+    const expiredFileCount = await expireOldFiles(cutoff);
 
     if (expiredClipboard) {
       broadcast('text-updated', expiredClipboard);
@@ -54,10 +56,14 @@ export async function runExpiryCleanup() {
     if (expiredImageCount > 0) {
       broadcast('images-changed', { reason: 'expired' });
     }
-    if (expiredClipboard || expiredImageCount > 0) {
+    if (expiredFileCount > 0) {
+      broadcast('files-changed', { reason: 'expired' });
+    }
+    if (expiredClipboard || expiredImageCount > 0 || expiredFileCount > 0) {
       logger.info('Expiry cleanup removed expired content', {
         clipboardExpired: Boolean(expiredClipboard),
         imagesExpired: expiredImageCount,
+        filesExpired: expiredFileCount,
       });
     }
   } catch (error) {

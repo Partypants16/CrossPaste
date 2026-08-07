@@ -1,0 +1,3 @@
+shared_files
+scripts/edit_index.py
+tests/file-service.test.js

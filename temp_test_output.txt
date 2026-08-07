@@ -1,0 +1,63 @@
+
+> crosspaste@1.0.0 test
+> node --test
+
+✔ GET /api/health reports ok status without leaking internal details (20.3776ms)
+✔ GET /api/state returns the clipboard, images, and limits (5.0905ms)
+✔ PUT /api/clipboard saves content and returns the new revision (31.0345ms)
+✔ PUT /api/clipboard with a stale baseRevision returns 409 with the current server state (4.8971ms)
+✔ PUT /api/clipboard rejects unexpected fields (4.3108ms)
+✔ POST /api/images without a file returns 400 (4.823ms)
+✔ POST /api/images accepts a PNG upload and GET /api/images lists it (23.8799ms)
+✔ GET /api/images/:id/thumbnail returns image bytes for a stored image (8.5776ms)
+✔ GET /api/images/:id for a missing id returns 404 (4.0893ms)
+✔ DELETE /api/images/:id removes the image (9.7332ms)
+✔ write rate limiting rejects requests beyond the configured maximum (3.0302ms)
+✔ a fresh database starts with an empty revision-0 clipboard (18.3557ms)
+✔ saveClipboard stores sanitised content and increments the revision (2.7973ms)
+✔ saveClipboard rejects a stale baseRevision with RevisionConflictError (0.919ms)
+✔ saveClipboard with force=true overwrites regardless of baseRevision (0.5973ms)
+✔ saveClipboard rejects text over the configured character limit (0.8856ms)
+✔ clearClipboard empties the content and bumps the revision (0.9479ms)
+✔ openDatabase creates the data directory and initialises the schema (59.4097ms)
+✔ re-running migrations on an existing database does not duplicate the clipboard row (1.7771ms)
+✔ isDatabaseHealthy reflects the open/closed state of the connection (4.3887ms)
+✔ storeFile writes the bytes to disk and persists sanitised metadata (32.6385ms)
+✔ listFiles returns a deterministic ascending sort order without private disk names (7.7944ms)
+✔ getRemainingCapacity reflects stored files and never becomes negative (6.9874ms)
+✔ storeFile rejects content above the configured size limit without side effects (2.3764ms)
+✔ storeFile rejects a file above the configured count limit without side effects (8.9311ms)
+✔ file lookup returns public and database shapes and reports missing IDs (3.5131ms)
+✔ deleteFile removes both disk content and its database record (3.5365ms)
+✔ expireOldFiles removes only expired disk content and database records (6.1034ms)
+✔ GET /api/files starts empty and POST /api/files returns public metadata (46.6523ms)
+✔ GET /api/files/:id returns metadata without exposing the stored filename (12.7134ms)
+✔ GET /api/files/:id/download returns the original bytes as an attachment (14.1674ms)
+✔ DELETE /api/files/:id removes database metadata and the stored bytes (19.6566ms)
+✔ file routes return FILE_NOT_FOUND for unknown ids without changing state (20.339ms)
+✔ POST /api/files enforces count and size limits without persisting rejected files (39.2231ms)
+✔ POST requires the multipart file field (8.3559ms)
+✔ successful uploads and deletes broadcast files-changed, while failures do not (20.7467ms)
+✔ tests\helpers\test-env.js (68.2369ms)
+✔ storeImage accepts a PNG and writes it with a random filename, not the original name (35.3561ms)
+✔ storeImage accepts JPEG and GIF, and preserves the GIF byte-for-byte (15.4052ms)
+✔ storeImage rejects a file whose magic bytes are not a supported image type (0.958ms)
+✔ storeImage rejects a buffer larger than the configured size limit (0.2432ms)
+✔ storeImage enforces the global image count limit on the server (18.6817ms)
+✔ deleteImage removes both the database row and the file from disk (7.1451ms)
+✔ sanitiseHtml removes script elements (2.7089ms)
+✔ sanitiseHtml removes inline event handler attributes (0.3635ms)
+✔ sanitiseHtml removes iframes, forms, and objects (0.2708ms)
+✔ sanitiseHtml strips javascript: URLs from links (0.4624ms)
+✔ sanitiseHtml keeps safe formatting tags (0.239ms)
+✔ sanitiseHtml allows a safe http link with target and rel (0.311ms)
+✔ extractPlainText converts block breaks to newlines and strips tags (0.3197ms)
+✔ countCharacters counts unicode code points, not UTF-16 code units (0.082ms)
+ℹ tests 51
+ℹ suites 0
+ℹ pass 51
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1132.3952

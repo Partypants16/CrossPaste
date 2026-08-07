@@ -129,11 +129,21 @@
           <button type="button" class="button button--ghost" id="recovery-discard">Discard It</button>
         </div>
       </div>
-    </section>
+    
+<div class="media-panel-bottom">
+  <div class="toolbar" role="toolbar">
+    <button type="button" class="toolbar-button" id="upload-file-button">Upload File</button>
+    <button type="button" class="toolbar-button" id="download-file-button">Download</button>
+    <button type="button" class="toolbar-button toolbar-button--danger" id="delete-file-button">Delete</button>
+  </div>
+  <ul id="file-list" class="file-grid"></ul>
+</div></section>
 
     <div class="workspace-divider" role="separator" aria-orientation="vertical"></div>
 
-    <section class="panel image-panel" aria-labelledby="image-panel-heading">
+    
+<div class="media-panel-top">
+<section class="panel image-panel" aria-labelledby="image-panel-heading">
       <h2 class="visually-hidden" id="image-panel-heading">Shared images</h2>
 
       <div class="toolbar toolbar--wrap" role="toolbar" aria-label="Image actions">
@@ -172,7 +182,8 @@
           <button type="button" class="button button--ghost" id="delete-image-cancel">Cancel</button>
         </div>
       </div>
-    </section>
+    
+</div></section>
   </main>
 
   <div id="clear-text-panel" class="conflict-panel" hidden role="alertdialog" aria-labelledby="clear-text-title">
