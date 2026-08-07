@@ -18,6 +18,7 @@ async function main() {
   const destination = path.resolve(process.argv[2] || path.join('backups', 'exports', `export-${timestamp}`));
   await fs.mkdir(path.join(destination, 'uploads'), { recursive: true });
   await fs.mkdir(path.join(destination, 'thumbnails'), { recursive: true });
+  await fs.mkdir(path.join(destination, 'files'), { recursive: true });
 
   const clipboard = getClipboardState();
   const images = listImages();
@@ -36,27 +37,32 @@ async function main() {
   }
 
   const fileList = listFiles();
-  const exportFiles = await Promise.all(fileList.map(async (file) => {
+  const exportedFiles = [];
+  for (const file of fileList) {
     const row = getFileRowById(file.id);
-    const storedName = row.stored_filename;
-    const dataBase64 = (await fs.readFile(path.join(config.filesDirectory, storedName))).toString('base64');
-    return {
-      id: file.id,
-      storedFilename: storedName,
+    await fs.copyFile(
+      path.join(config.filesDirectory, row.stored_filename),
+      path.join(destination, 'files', row.stored_filename)
+    );
+    exportedFiles.push({
+      storedFilename: row.stored_filename,
       originalFilename: row.original_filename,
       mimeType: row.mime_type,
       sizeBytes: row.size_bytes,
       createdAt: row.created_at,
-      contentBase64: dataBase64
-    };
-  }));
+    });
+  }
 
-  await fs.writeFile(
-    path.join(destination, 'state.json'),
-    JSON.stringify({ files: exportFiles }, null, 2)
-  );
+  const manifest = {
+    exportedAt: new Date().toISOString(),
+    clipboard: { contentHtml: clipboard.contentHtml },
+    images,
+    files: exportedFiles,
+  };
 
-  console.log(`Exported clipboard state, ${images.length} image(s), and ${fileList.length} file(s) to: ${destination}`);
+  await fs.writeFile(path.join(destination, 'manifest.json'), JSON.stringify(manifest, null, 2));
+
+  console.log(`Exported clipboard state, ${images.length} image(s), and ${exportedFiles.length} file(s) to: ${destination}`);
 }
 
 main()

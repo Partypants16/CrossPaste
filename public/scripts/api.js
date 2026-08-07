@@ -88,3 +88,21 @@ export function imageThumbnailUrl(id) {
 export function imageDownloadUrl(id) {
   return `/api/images/${encodeURIComponent(id)}/download`;
 }
+
+export function fetchFiles() {
+  return request('/api/files');
+}
+
+export async function uploadFile(file) {
+  const formData = new FormData();
+  formData.append('file', file, file.name || 'upload');
+  return request('/api/files', { method: 'POST', body: formData });
+}
+
+export function deleteFileRequest(id) {
+  return request(`/api/files/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function fileDownloadUrl(id) {
+  return `/api/files/${encodeURIComponent(id)}/download`;
+}

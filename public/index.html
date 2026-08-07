@@ -129,21 +129,13 @@
           <button type="button" class="button button--ghost" id="recovery-discard">Discard It</button>
         </div>
       </div>
-    
-<div class="media-panel-bottom">
-  <div class="toolbar" role="toolbar">
-    <button type="button" class="toolbar-button" id="upload-file-button">Upload File</button>
-    <button type="button" class="toolbar-button" id="download-file-button">Download</button>
-    <button type="button" class="toolbar-button toolbar-button--danger" id="delete-file-button">Delete</button>
-  </div>
-  <ul id="file-list" class="file-grid"></ul>
-</div></section>
+    </section>
 
     <div class="workspace-divider" role="separator" aria-orientation="vertical"></div>
 
-    
-<div class="media-panel-top">
-<section class="panel image-panel" aria-labelledby="image-panel-heading">
+    <div class="media-panel">
+    <div class="media-panel-top">
+    <section class="panel image-panel" aria-labelledby="image-panel-heading">
       <h2 class="visually-hidden" id="image-panel-heading">Shared images</h2>
 
       <div class="toolbar toolbar--wrap" role="toolbar" aria-label="Image actions">
@@ -182,8 +174,46 @@
           <button type="button" class="button button--ghost" id="delete-image-cancel">Cancel</button>
         </div>
       </div>
-    
-</div></section>
+    </section>
+    </div>
+
+    <div class="media-panel-bottom">
+    <section class="panel file-panel" aria-labelledby="file-panel-heading">
+      <h2 class="visually-hidden" id="file-panel-heading">Shared files</h2>
+
+      <div class="toolbar toolbar--wrap" role="toolbar" aria-label="File actions">
+        <label class="toolbar-button toolbar-button--file" for="file-file-input">
+          <span aria-hidden="true">⬆</span><span class="toolbar-button__label">Upload File</span>
+        </label>
+        <input type="file" id="file-file-input" hidden aria-label="Choose a file to upload" />
+        <button type="button" class="toolbar-button" id="download-file-button" title="Download the selected file" aria-label="Download selected file" disabled>
+          <span aria-hidden="true">⬇</span><span class="toolbar-button__label">Download</span>
+        </button>
+        <button type="button" class="toolbar-button toolbar-button--danger" id="delete-file-button" title="Delete the selected file" aria-label="Delete selected file" disabled>
+          <span aria-hidden="true">🗑</span><span class="toolbar-button__label">Delete</span>
+        </button>
+      </div>
+
+      <p id="file-count-status" class="image-count-status">0 of 10 files stored</p>
+      <div id="file-limit-message" class="inline-message inline-message--warning" hidden role="alert"></div>
+      <div id="file-error-message" class="inline-message inline-message--error" hidden role="alert"></div>
+
+      <div id="file-dropzone" class="image-dropzone">
+        <ul id="file-list" class="file-grid" aria-label="Stored files"></ul>
+        <p id="file-empty-state" class="file-empty-state">No files yet. Upload or drag one here.</p>
+      </div>
+
+      <div id="delete-file-panel" class="conflict-panel" hidden role="alertdialog" aria-labelledby="delete-file-title">
+        <h3 id="delete-file-title">Delete this file?</h3>
+        <p>This removes <span id="delete-file-name">this file</span> for every device using CrossPaste. This cannot be undone.</p>
+        <div class="conflict-panel__actions">
+          <button type="button" class="button button--danger" id="delete-file-confirm">Delete</button>
+          <button type="button" class="button button--ghost" id="delete-file-cancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+    </div>
+    </div>
   </main>
 
   <div id="clear-text-panel" class="conflict-panel" hidden role="alertdialog" aria-labelledby="clear-text-title">

@@ -1,17 +1,18 @@
 # CrossPaste
 
-A self-hosted, single shared clipboard for moving formatted text and images between
-your own devices — laptop, phone, tablet — over your home network or your own VPN.
-No accounts, no cloud, no public internet exposure.
+A self-hosted, single shared clipboard for moving formatted text, images, and files
+between your own devices — laptop, phone, tablet — over your home network or your own
+VPN. No accounts, no cloud, no public internet exposure.
 
 Paste something on one device, open CrossPaste on another, and it's there.
 
 ## 1. Project overview
 
-CrossPaste is one shared text area and one shared image tray, synced in real time to
-every device that has the page open. There is exactly one clipboard — no folders, no
-documents, no per-user data. It's meant to replace "email it to yourself" or "send it
-to yourself on chat" when you just need to move something between your own devices.
+CrossPaste is one shared text area, one shared image tray, and one shared file tray,
+synced in real time to every device that has the page open. There is exactly one
+clipboard — no folders, no documents, no per-user data. It's meant to replace "email it
+to yourself" or "send it to yourself on chat" when you just need to move something
+between your own devices.
 
 ## 2. Main features
 
@@ -20,12 +21,14 @@ to yourself on chat" when you just need to move something between your own devic
 - Autosave with conflict detection — no accidental overwrites between devices.
 - Up to 10 shared images (PNG, JPEG, WebP, animated GIF), with thumbnails, download,
   and clipboard copy.
+- Up to 10 shared files of any type (up to 25 MB each by default), with upload,
+  drag-and-drop, download, and delete.
 - Real-time sync across every open device via Server-Sent Events.
 - Works over plain HTTP on your LAN; optional internal HTTPS for full clipboard-button
   support.
 - No accounts. Optionally, a single shared access token if you want a light gate.
-- Everything — text, images, thumbnails, database — lives in one folder on your own
-  server, backed by SQLite and the filesystem. No cloud services of any kind.
+- Everything — text, images, files, thumbnails, database — lives in one folder on your
+  own server, backed by SQLite and the filesystem. No cloud services of any kind.
 
 ## 3. Architecture
 
@@ -34,9 +37,10 @@ to yourself on chat" when you just need to move something between your own devic
 - **Backend**: Node.js + Express, serving both the static frontend and a small JSON
   API under `/api`.
 - **Database**: SQLite (via `better-sqlite3`), one file, WAL mode, foreign keys on.
-- **File storage**: uploaded images and generated thumbnails on the local filesystem.
+- **File storage**: uploaded images, generated thumbnails, and uploaded shared files on
+  the local filesystem.
 - **Real-time sync**: Server-Sent Events (`/api/events`) — one persistent connection
-  per open tab, broadcasting text and image changes.
+  per open tab, broadcasting text, image, and file changes.
 - **Reverse proxy (optional)**: Caddy, for an internal HTTPS hostname using its
   built-in local certificate authority (`tls internal`).
 - **Packaging**: Docker + Docker Compose. Two containers: `app` (Node) and `caddy`.
@@ -424,7 +428,7 @@ as 80/443.
 Everything CrossPaste needs to keep is under one folder on the host:
 
 ```text
-./data/               SQLite database, uploaded images, generated thumbnails
+./data/               SQLite database, uploaded images, generated thumbnails, shared files
 ./caddy/data/         Caddy's internal CA and issued certificates
 ./caddy/config/       Caddy's autosaved runtime configuration
 ```
@@ -441,8 +445,9 @@ container filesystem entirely, directly on the Ubuntu Server's disk.
 
 This uses SQLite's own online backup API (via `scripts/backup.js`, run inside the
 container) to take a consistent snapshot of the database — it does **not** just copy
-the `.db` file, which could capture it mid-write. The snapshot, `uploads/`, and
-`thumbnails/` are then archived to `./backups/crosspaste-backup-<timestamp>.tar.gz`.
+the `.db` file, which could capture it mid-write. The snapshot, `uploads/`,
+`thumbnails/`, and `files/` are then archived to
+`./backups/crosspaste-backup-<timestamp>.tar.gz`.
 
 Verify a backup archive is readable without extracting it:
 
@@ -486,7 +491,7 @@ to confirm the restored database passes an integrity check.
 
 ## 29. Clearing all stored content
 
-To wipe the shared text and delete every stored image (destructive, asks for
+To wipe the shared text and delete every stored image and file (destructive, asks for
 confirmation):
 
 ```bash
@@ -497,8 +502,8 @@ Add `--yes` to skip the interactive confirmation (useful for scripted resets).
 
 ## 30. Configuring automatic expiry
 
-Disabled by default. To automatically clear text and delete images older than a fixed
-age, set in `.env`:
+Disabled by default. To automatically clear text and delete images and files older than
+a fixed age, set in `.env`:
 
 ```text
 CONTENT_EXPIRY_HOURS=24
@@ -519,9 +524,11 @@ All in `.env` (see that file for full descriptions), then `docker compose up -d`
 | `IMAGE_COUNT_LIMIT` | `10` | Maximum images stored at once, globally |
 | `IMAGE_SIZE_LIMIT_MB` | `10` | Maximum accepted upload size per image |
 | `IMAGE_MAX_DIMENSION` | `2000` | Longest-side resize target in pixels (GIFs exempt) |
+| `FILE_COUNT_LIMIT` | `10` | Maximum files stored at once, globally |
+| `FILE_SIZE_LIMIT_MB` | `25` | Maximum accepted upload size per file |
 | `AUTOSAVE_DELAY_MS` | `800` | Debounce delay before autosaving text |
 | `WRITE_RATE_LIMIT_MAX` / `_WINDOW_MS` | `120` / `60000` | Text-save rate limit |
-| `UPLOAD_RATE_LIMIT_MAX` / `_WINDOW_MS` | `20` / `60000` | Image-upload rate limit |
+| `UPLOAD_RATE_LIMIT_MAX` / `_WINDOW_MS` | `20` / `60000` | Image/file-upload rate limit |
 
 ## 32. Troubleshooting
 

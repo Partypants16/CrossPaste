@@ -24,6 +24,10 @@ function connect() {
     listeners.onImagesChanged(JSON.parse(event.data));
   });
 
+  eventSource.addEventListener('files-changed', (event) => {
+    listeners.onFilesChanged(JSON.parse(event.data));
+  });
+
   eventSource.onerror = () => {
     listeners.onDisconnected();
     teardown();

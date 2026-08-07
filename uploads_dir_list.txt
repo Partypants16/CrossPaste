@@ -1,5 +1,0 @@
- Volume in drive C is Windows-SSD
- Volume Serial Number is FEF5-2293
-
- Directory of C:\Users\parth\OneDrive - Monash University\Personal\Projects\crosspaste
-

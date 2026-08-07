@@ -2,6 +2,7 @@ import * as api from './api.js';
 import { createEditor } from './editor.js';
 import { readClipboardIntoEditor, copyEditorContent } from './clipboard.js';
 import { createImagePanel } from './images.js';
+import { createFilePanel } from './files.js';
 import { startRealtime } from './realtime.js';
 import { saveLocalRecovery, loadLocalRecovery, clearLocalRecovery } from './recovery.js';
 import { extractPlainText } from './sanitize.js';
@@ -247,6 +248,38 @@ async function refreshImages() {
   }
 }
 
+// File panel
+
+const filePanel = createFilePanel(
+  {
+    list: document.getElementById('file-list'),
+    emptyState: document.getElementById('file-empty-state'),
+    downloadButton: document.getElementById('download-file-button'),
+    deleteButton: document.getElementById('delete-file-button'),
+    countStatus: document.getElementById('file-count-status'),
+    limitMessage: document.getElementById('file-limit-message'),
+    errorMessage: document.getElementById('file-error-message'),
+    fileInput: document.getElementById('file-file-input'),
+    dropzone: document.getElementById('file-dropzone'),
+    deletePanel: document.getElementById('delete-file-panel'),
+    deleteFilename: document.getElementById('delete-file-name'),
+    deleteConfirmButton: document.getElementById('delete-file-confirm'),
+    deleteCancelButton: document.getElementById('delete-file-cancel'),
+  },
+  {
+    onImageFiles: (images) => imagePanel.uploadFiles(images),
+  }
+);
+
+async function refreshFiles() {
+  try {
+    const state = await api.fetchState();
+    filePanel.setFiles(state.files, state.limits);
+  } catch {
+    // A transient failure here just leaves the previous file list visible.
+  }
+}
+
 // Realtime sync
 
 startRealtime({
@@ -263,6 +296,7 @@ startRealtime({
         }
       }
       imagePanel.setImages(state.images, state.limits);
+      filePanel.setFiles(state.files, state.limits);
     } catch {
       // Reconciliation failure on reconnect is non-fatal; the next event will retry.
     }
@@ -280,6 +314,9 @@ startRealtime({
   onImagesChanged: () => {
     refreshImages();
   },
+  onFilesChanged: () => {
+    refreshFiles();
+  },
 });
 
 window.addEventListener('online', () => {
@@ -296,6 +333,7 @@ document.getElementById('refresh-button').addEventListener('click', async () => 
       setSaveStatus('remote-update');
     }
     imagePanel.setImages(state.images, state.limits);
+    filePanel.setFiles(state.files, state.limits);
     announce('Refreshed');
   } catch {
     setSaveStatus('offline');
@@ -327,6 +365,7 @@ async function init() {
 
     updateCharCounter();
     imagePanel.setImages(state.images, state.limits);
+    filePanel.setFiles(state.files, state.limits);
   } catch {
     setConnectionStatus('offline');
     setSaveStatus('offline');

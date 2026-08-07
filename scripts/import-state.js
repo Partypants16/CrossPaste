@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Restores a clipboard text + image export created by export-state.js. This replaces
-// whatever is currently stored, so it always asks for confirmation unless --yes is given.
+// Restores a clipboard text + image + shared-file export created by export-state.js.
+// This replaces whatever is currently stored, so it always asks for confirmation
+// unless --yes is given.
 // Usage: node scripts/import-state.js <export-directory> [--yes]
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -9,6 +10,8 @@ import { config } from '../server/config.js';
 import { openDatabase, closeDatabase, getDatabase } from '../server/database.js';
 import { saveClipboard, clearClipboard } from '../server/services/clipboard-service.js';
 import { listImages, deleteImage } from '../server/services/image-service.js';
+import { listFiles, deleteFile } from '../server/services/file-service.js';
+import { generateStoredFilename, sanitiseOriginalFilename } from '../server/utilities/files.js';
 
 const skipConfirmation = process.argv.includes('--yes');
 const sourceDirectory = process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
@@ -23,6 +26,15 @@ async function confirm(question) {
   }
 }
 
+function isSafeStoredFilename(name) {
+  return typeof name === 'string' && name.length > 0 && name === path.basename(name) && !name.includes('..');
+}
+
+function extensionOf(storedFilename) {
+  const ext = path.extname(storedFilename || '').replace(/^\./, '');
+  return ext || 'bin';
+}
+
 async function main() {
   if (!sourceDirectory) {
     console.error('Usage: node scripts/import-state.js <export-directory> [--yes]');
@@ -32,10 +44,11 @@ async function main() {
 
   const manifestRaw = await fs.readFile(path.join(sourceDirectory, 'manifest.json'), 'utf8');
   const manifest = JSON.parse(manifestRaw);
+  const manifestFiles = Array.isArray(manifest.files) ? manifest.files : [];
 
-  console.log(`This will REPLACE the current clipboard text and all images with the export from:`);
+  console.log(`This will REPLACE the current clipboard text, all images, and all shared files with the export from:`);
   console.log(`  ${sourceDirectory}`);
-  console.log(`  (${manifest.images.length} image(s), exported at ${manifest.exportedAt})`);
+  console.log(`  (${manifest.images.length} image(s), ${manifestFiles.length} file(s), exported at ${manifest.exportedAt})`);
 
   if (!skipConfirmation) {
     const confirmed = await confirm('Type "yes" to continue: ');
@@ -51,6 +64,9 @@ async function main() {
   for (const image of listImages()) {
     await deleteImage(image.id);
   }
+  for (const file of listFiles()) {
+    await deleteFile(file.id);
+  }
   clearClipboard();
 
   saveClipboard({ html: manifest.clipboard.contentHtml, baseRevision: null, force: true });
@@ -64,6 +80,11 @@ async function main() {
 
   let sortOrder = 0;
   for (const image of imagesToImport) {
+    if (!isSafeStoredFilename(image.storedFilename) || (image.thumbnailFilename && !isSafeStoredFilename(image.thumbnailFilename))) {
+      console.warn(`Skipping an image with an unsafe stored filename.`);
+      continue;
+    }
+
     await fs.copyFile(
       path.join(sourceDirectory, 'uploads', image.storedFilename),
       path.join(config.uploadDirectory, image.storedFilename)
@@ -93,7 +114,47 @@ async function main() {
     sortOrder += 1;
   }
 
-  console.log(`Imported clipboard text and ${imagesToImport.length} image(s).`);
+  const filesToImport = manifestFiles.slice(0, config.fileCountLimit);
+  if (manifestFiles.length > filesToImport.length) {
+    console.warn(
+      `Skipping ${manifestFiles.length - filesToImport.length} file(s) beyond the configured limit of ${config.fileCountLimit}.`
+    );
+  }
+
+  let fileSortOrder = 0;
+  let filesImported = 0;
+  for (const file of filesToImport) {
+    if (!isSafeStoredFilename(file.storedFilename)) {
+      console.warn(`Skipping a file with an unsafe stored filename.`);
+      continue;
+    }
+
+    const sourcePath = path.join(sourceDirectory, 'files', file.storedFilename);
+    const newStoredFilename = generateStoredFilename(extensionOf(file.storedFilename));
+    try {
+      await fs.copyFile(sourcePath, path.join(config.filesDirectory, newStoredFilename));
+    } catch (error) {
+      console.warn(`Skipping "${file.originalFilename}": could not read its exported bytes (${error.message}).`);
+      continue;
+    }
+
+    db.prepare(
+      `INSERT INTO files
+        (stored_filename, original_filename, mime_type, size_bytes, sort_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      newStoredFilename,
+      sanitiseOriginalFilename(file.originalFilename),
+      file.mimeType || 'application/octet-stream',
+      file.sizeBytes,
+      fileSortOrder,
+      file.createdAt
+    );
+    fileSortOrder += 1;
+    filesImported += 1;
+  }
+
+  console.log(`Imported clipboard text, ${imagesToImport.length} image(s), and ${filesImported} file(s).`);
 }
 
 main()
