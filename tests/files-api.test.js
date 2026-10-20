@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import http from 'node:http';
 import path from 'node:path';
 import request from 'supertest';
 import { setupTestEnvironment, teardownTestEnvironment } from './helpers/test-env.js';
@@ -22,6 +23,15 @@ async function readBinary(response, callback) {
   const chunks = [];
   response.on('data', (chunk) => chunks.push(chunk));
   response.on('end', () => callback(null, Buffer.concat(chunks)));
+}
+
+async function waitForEmptyIncoming(timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await fs.readdir(config.incomingDirectory)).length === 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.deepEqual(await fs.readdir(config.incomingDirectory), []);
 }
 
 async function clearFileStorage() {
@@ -73,6 +83,7 @@ test('GET /api/files starts empty and POST /api/files returns public metadata', 
   assert.equal(typeof uploaded.body.file.id, 'number');
   assert.ok(!Number.isNaN(Date.parse(uploaded.body.file.createdAt)));
   assert.equal(uploaded.body.file.storedFilename, undefined);
+  assert.deepEqual(await fs.readdir(config.incomingDirectory), []);
 
   const second = await upload('second.bin', Buffer.from([0, 1, 2]));
   assert.equal(second.status, 201);
@@ -173,6 +184,7 @@ test('POST /api/files enforces count and size limits without persisting rejected
   assert.equal(countLimited.body.error.code, 'FILE_LIMIT_REACHED');
   assert.equal((await request(app).get('/api/files')).body.files.length, 2);
   assert.equal((await fs.readdir(config.filesDirectory)).length, 2);
+  await waitForEmptyIncoming();
 
   await clearFileStorage();
   const tooLarge = await upload('huge.bin', Buffer.alloc(ONE_MIB + 1));
@@ -180,6 +192,44 @@ test('POST /api/files enforces count and size limits without persisting rejected
   assert.equal(tooLarge.body.error.code, 'FILE_TOO_LARGE');
   assert.deepEqual((await request(app).get('/api/files')).body.files, []);
   assert.deepEqual(await fs.readdir(config.filesDirectory), []);
+  await waitForEmptyIncoming();
+});
+
+test('an upload aborted by the client mid-transfer leaves no partial file or row behind', async () => {
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const boundary = 'crosspaste-abort-test';
+    const req = http.request({
+      host: '127.0.0.1',
+      port: server.address().port,
+      path: '/api/files',
+      method: 'POST',
+      headers: {
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+        'content-length': String(ONE_MIB),
+      },
+    });
+    req.on('error', () => {});
+    req.write(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.bin"\r\n` +
+      'Content-Type: application/octet-stream\r\n\r\n');
+    req.write(Buffer.alloc(256 * 1024, 7));
+
+    // Wait until multer has started writing the partial file, then drop the connection.
+    const deadline = Date.now() + 2000;
+    while ((await fs.readdir(config.incomingDirectory)).length === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal((await fs.readdir(config.incomingDirectory)).length, 1);
+    req.destroy();
+
+    await waitForEmptyIncoming();
+    assert.deepEqual((await request(app).get('/api/files')).body.files, []);
+    assert.deepEqual(await fs.readdir(config.filesDirectory), []);
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test('POST requires the multipart file field', async () => {

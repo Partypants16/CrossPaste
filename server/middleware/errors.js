@@ -72,6 +72,12 @@ export function errorHandler(error, req, res, _next) {
     );
   }
 
+  // e.g. an upload cancelled from the progress bar: the client is gone, so nothing to answer.
+  if (req.socket?.destroyed) {
+    logger.info('Request ended by the client before completion', { path: req.path, method: req.method });
+    return;
+  }
+
   logger.error('Unhandled server error', {
     path: req.path,
     method: req.method,

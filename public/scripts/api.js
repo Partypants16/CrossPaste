@@ -8,6 +8,15 @@ export class ApiError extends Error {
   }
 }
 
+function errorFromResponse(status, body) {
+  const error = body?.error || {};
+  return new ApiError(error.message || 'The server returned an error.', {
+    status,
+    code: error.code || 'UNKNOWN_ERROR',
+    details: error,
+  });
+}
+
 async function request(path, options = {}) {
   let response;
   try {
@@ -24,12 +33,7 @@ async function request(path, options = {}) {
   const body = contentType.includes('application/json') ? await response.json().catch(() => null) : null;
 
   if (!response.ok) {
-    const error = body?.error || {};
-    throw new ApiError(error.message || 'The server returned an error.', {
-      status: response.status,
-      code: error.code || 'UNKNOWN_ERROR',
-      details: error,
-    });
+    throw errorFromResponse(response.status, body);
   }
 
   return body;
@@ -93,10 +97,42 @@ export function fetchFiles() {
   return request('/api/files');
 }
 
-export async function uploadFile(file) {
-  const formData = new FormData();
-  formData.append('file', file, file.name || 'upload');
-  return request('/api/files', { method: 'POST', body: formData });
+/**
+ * Uploads one shared file. Uses XMLHttpRequest rather than fetch because fetch cannot
+ * report upload progress. `onProgress({ loaded, total })` fires as bytes are sent
+ * (`total` is null if the browser can't tell), `onSent()` once the whole body is sent
+ * and the server is saving it, and aborting `signal` cancels the upload.
+ */
+export function uploadFile(file, { onProgress, onSent, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/files');
+
+    xhr.upload.addEventListener('progress', (event) => {
+      onProgress?.({ loaded: event.loaded, total: event.lengthComputable ? event.total : null });
+    });
+    xhr.upload.addEventListener('load', () => onSent?.());
+
+    xhr.addEventListener('load', () => {
+      let body = null;
+      if ((xhr.getResponseHeader('content-type') || '').includes('application/json')) {
+        try {
+          body = JSON.parse(xhr.responseText);
+        } catch {
+          body = null;
+        }
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+      else reject(errorFromResponse(xhr.status, body));
+    });
+    xhr.addEventListener('error', () => reject(new ApiError('Could not reach the server.', { code: 'NETWORK_ERROR' })));
+    xhr.addEventListener('abort', () => reject(new ApiError('Upload cancelled.', { code: 'UPLOAD_CANCELLED' })));
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
+
+    const formData = new FormData();
+    formData.append('file', file, file.name || 'upload');
+    xhr.send(formData);
+  });
 }
 
 export function deleteFileRequest(id) {

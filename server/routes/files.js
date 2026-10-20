@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { config } from '../config.js';
 import { uploadRateLimiter } from '../middleware/rate-limits.js';
 import { broadcast } from '../services/realtime-service.js';
 import { logger } from '../utilities/logger.js';
+import { deleteFileIfExists } from '../utilities/files.js';
 import {
   storeFile,
   listFiles,
@@ -15,8 +17,13 @@ import {
 
 export const filesRouter = Router();
 
+// Uploads stream to disk rather than memory, since a single file can be hundreds of MB.
+// Multer removes the partial file itself if the upload is aborted or exceeds the limit.
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: config.incomingDirectory,
+    filename: (_req, _file, callback) => callback(null, `${crypto.randomUUID()}.part`),
+  }),
   limits: { fileSize: config.fileSizeLimitBytes, files: 1 },
 });
 
@@ -32,15 +39,18 @@ filesRouter.post('/files', uploadRateLimiter, upload.single('file'), async (req,
       return res.status(400).json({ error: { code: 'MISSING_FILE', message: 'No file was provided.' } });
     }
     const file = await storeFile({
-      buffer: req.file.buffer,
+      tempPath: req.file.path,
       originalFilename: req.file.originalname,
       mimeType: req.file.mimetype,
     });
     broadcast('files-changed', { reason: 'uploaded', fileId: file.id });
-    logger.info('File uploaded', { fileId: file.id, mimeType: file.mimeType });
+    logger.info('File uploaded', { fileId: file.id, mimeType: file.mimeType, sizeBytes: file.sizeBytes });
     res.status(201).json({ file });
   } catch (error) {
     next(error);
+  } finally {
+    // Already moved on success; this only cleans up after a rejected upload.
+    if (req.file) await deleteFileIfExists(req.file.path);
   }
 });
 

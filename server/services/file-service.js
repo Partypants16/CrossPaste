@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileTypeFromBuffer } from 'file-type';
+import { fileTypeFromBuffer, fileTypeFromFile } from 'file-type';
 import { getDatabase } from '../database.js';
 import { config } from '../config.js';
 import { logger } from '../utilities/logger.js';
@@ -8,6 +8,7 @@ import {
   generateStoredFilename,
   sanitiseOriginalFilename,
   deleteFileIfExists,
+  moveFile,
 } from '../utilities/files.js';
 
 export class FileTooLargeError extends Error {
@@ -40,12 +41,18 @@ function countFiles(db) {
   return db.prepare('SELECT COUNT(*) AS total FROM files').get().total;
 }
 
-export async function storeFile({ buffer, originalFilename, mimeType: declaredMimeType }) {
-  if (buffer.length > config.fileSizeLimitBytes) {
-    throw new FileTooLargeError(buffer.length);
+/**
+ * Stores a shared file from either an in-memory `buffer` or a `tempPath` on disk (how
+ * HTTP uploads arrive, so large files never sit in memory). A `tempPath` is moved into
+ * the files directory on success; on failure the caller still owns it and must delete it.
+ */
+export async function storeFile({ buffer, tempPath, originalFilename, mimeType: declaredMimeType }) {
+  const sizeBytes = buffer ? buffer.length : (await fs.stat(tempPath)).size;
+  if (sizeBytes > config.fileSizeLimitBytes) {
+    throw new FileTooLargeError(sizeBytes);
   }
 
-  const detected = await fileTypeFromBuffer(buffer);
+  const detected = buffer ? await fileTypeFromBuffer(buffer) : await fileTypeFromFile(tempPath);
   const mimeType = detected?.mime || declaredMimeType || 'application/octet-stream';
   let extension = detected?.ext;
   if (!extension && originalFilename) {
@@ -60,7 +67,6 @@ export async function storeFile({ buffer, originalFilename, mimeType: declaredMi
 
   const storedFilename = generateStoredFilename(extension);
   const safeOriginalFilename = sanitiseOriginalFilename(originalFilename);
-  const sizeBytes = buffer.length;
   const timestamp = nowIso();
 
   const db = getDatabase();
@@ -89,7 +95,12 @@ export async function storeFile({ buffer, originalFilename, mimeType: declaredMi
   const fileId = insertRow();
 
   try {
-    await fs.writeFile(path.join(config.filesDirectory, storedFilename), buffer);
+    const storedPath = path.join(config.filesDirectory, storedFilename);
+    if (buffer) {
+      await fs.writeFile(storedPath, buffer);
+    } else {
+      await moveFile(tempPath, storedPath);
+    }
   } catch (error) {
     db.prepare('DELETE FROM files WHERE id = ?').run(fileId);
     await deleteFileIfExists(path.join(config.filesDirectory, storedFilename));
@@ -132,6 +143,19 @@ export async function deleteFile(id) {
 
   db.prepare('DELETE FROM files WHERE id = ?').run(id);
   return { id };
+}
+
+/** Removes partial uploads left behind by a crash or restart mid-upload. Startup only. */
+export async function clearIncomingUploads() {
+  let names;
+  try {
+    names = await fs.readdir(config.incomingDirectory);
+  } catch (error) {
+    if (error.code === 'ENOENT') return 0;
+    throw error;
+  }
+  await Promise.all(names.map((name) => deleteFileIfExists(path.join(config.incomingDirectory, name))));
+  return names.length;
 }
 
 export function getRemainingCapacity() {

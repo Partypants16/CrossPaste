@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { setupTestEnvironment, teardownTestEnvironment } from './helpers/test-env.js';
+import { createPngBuffer } from './helpers/fixtures.js';
 
 const originalEnvironment = { ...process.env };
 const tempDir = await setupTestEnvironment({ FILE_COUNT_LIMIT: 3, FILE_SIZE_LIMIT_MB: 1 });
@@ -17,6 +18,7 @@ const {
   deleteFile,
   getRemainingCapacity,
   expireOldFiles,
+  clearIncomingUploads,
   FileTooLargeError,
   FileLimitReachedError,
   FileNotFoundError,
@@ -81,6 +83,42 @@ test('storeFile writes the bytes to disk and persists sanitised metadata', async
     await fs.readFile(path.join(config.filesDirectory, row.stored_filename)),
     buffer
   );
+});
+
+test('storeFile moves a temp file into storage and detects its type from disk', async () => {
+  const contents = await createPngBuffer();
+  const tempPath = path.join(config.incomingDirectory, 'upload.part');
+  await fs.writeFile(tempPath, contents);
+
+  const file = await storeFile({ tempPath, originalFilename: 'picture', mimeType: 'application/octet-stream' });
+
+  assert.equal(file.mimeType, 'image/png');
+  assert.equal(file.sizeBytes, contents.length);
+  const row = getFileRowById(file.id);
+  assert.match(row.stored_filename, /\.png$/);
+  assert.deepEqual(await fs.readFile(path.join(config.filesDirectory, row.stored_filename)), contents);
+  await assert.rejects(fs.access(tempPath), { code: 'ENOENT' });
+});
+
+test('storeFile leaves a rejected temp file for the caller and stores nothing', async () => {
+  const tempPath = path.join(config.incomingDirectory, 'oversized.part');
+  await fs.writeFile(tempPath, Buffer.alloc(config.fileSizeLimitBytes + 1));
+
+  await assert.rejects(() => storeFile({ tempPath, originalFilename: 'oversized.bin' }), FileTooLargeError);
+
+  assert.deepEqual(listFiles(), []);
+  assert.deepEqual(await fs.readdir(config.filesDirectory), []);
+  await fs.access(tempPath);
+  await fs.rm(tempPath);
+});
+
+test('clearIncomingUploads removes abandoned partial uploads', async () => {
+  await fs.writeFile(path.join(config.incomingDirectory, 'a.part'), 'partial');
+  await fs.writeFile(path.join(config.incomingDirectory, 'b.part'), 'partial');
+
+  assert.equal(await clearIncomingUploads(), 2);
+  assert.deepEqual(await fs.readdir(config.incomingDirectory), []);
+  assert.equal(await clearIncomingUploads(), 0);
 });
 
 test('listFiles returns a deterministic ascending sort order without private disk names', async () => {

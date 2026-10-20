@@ -8,6 +8,8 @@ import {
 import { showInlineMessage, hideInlineMessage, showPanel, hidePanel, announce } from './ui.js';
 
 const IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+// Uploads that finish faster than this never show the progress bar, so small files don't flicker it.
+const PROGRESS_REVEAL_DELAY_MS = 300;
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes)) return 'Unknown size';
@@ -15,6 +17,11 @@ function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function formatDuration(seconds) {
+  if (seconds < 90) return `${Math.max(1, Math.round(seconds))} s`;
+  return `${Math.round(seconds / 60)} min`;
 }
 
 function formatTimestamp(value) {
@@ -38,8 +45,14 @@ export function createFilePanel(elements, { onImageFiles, onChanged } = {}) {
   let selectedFileId = null;
   let pendingDeleteId = null;
   let fileCountLimit = 10;
-  let fileSizeLimitBytes = 25 * 1024 * 1024;
+  let fileSizeLimitBytes = 200 * 1024 * 1024;
+  let imageSizeLimitBytes = 10 * 1024 * 1024;
   let busy = false;
+  const uploadQueue = [];
+  let queuedTotal = 0;
+  let queuedDone = 0;
+  let activeUpload = null;
+  let progressRevealTimer = null;
 
   function findSelected() {
     return files.find((file) => file.id === selectedFileId) || null;
@@ -127,6 +140,7 @@ export function createFilePanel(elements, { onImageFiles, onChanged } = {}) {
     files = Array.isArray(nextFiles) ? nextFiles : [];
     if (Number.isFinite(limits.fileCountLimit)) fileCountLimit = limits.fileCountLimit;
     if (Number.isFinite(limits.fileSizeLimitBytes)) fileSizeLimitBytes = limits.fileSizeLimitBytes;
+    if (Number.isFinite(limits.imageSizeLimitBytes)) imageSizeLimitBytes = limits.imageSizeLimitBytes;
     if (selectedFileId != null && !files.some((file) => file.id === selectedFileId)) selectedFileId = null;
     render();
     updateActions();
@@ -142,18 +156,90 @@ export function createFilePanel(elements, { onImageFiles, onChanged } = {}) {
     }
   }
 
+  function showProgress(file) {
+    elements.progressName.textContent = queuedTotal > 1
+      ? `Uploading ${file.name} (${queuedDone} of ${queuedTotal})`
+      : `Uploading ${file.name}`;
+    elements.progressBar.value = 0;
+    elements.progressDetail.textContent = `0 B of ${formatBytes(file.size)}`;
+    elements.cancelButton.disabled = false;
+    if (elements.progress.hidden && progressRevealTimer == null) {
+      progressRevealTimer = setTimeout(() => {
+        progressRevealTimer = null;
+        elements.progress.hidden = false;
+      }, PROGRESS_REVEAL_DELAY_MS);
+    }
+  }
+
+  function updateProgress(file, startedAt, { loaded, total }) {
+    const sent = Math.min(loaded, file.size);
+    const percent = Math.min(100, Math.floor((loaded / (total || file.size || 1)) * 100));
+    elements.progressBar.value = percent;
+    const parts = [`${formatBytes(sent)} of ${formatBytes(file.size)}`, `${percent}%`];
+    const elapsedSeconds = (performance.now() - startedAt) / 1000;
+    if (elapsedSeconds >= 1 && sent > 0) {
+      const bytesPerSecond = sent / elapsedSeconds;
+      parts.push(`${formatBytes(bytesPerSecond)}/s`, `about ${formatDuration((file.size - sent) / bytesPerSecond)} left`);
+    }
+    elements.progressDetail.textContent = parts.join(' · ');
+  }
+
+  function showSaving() {
+    elements.progressBar.value = 100;
+    elements.progressDetail.textContent = 'Upload complete. Saving on the server…';
+    // Once every byte is sent the server keeps the file, so cancelling no longer means anything.
+    elements.cancelButton.disabled = true;
+  }
+
+  function hideProgress() {
+    clearTimeout(progressRevealTimer);
+    progressRevealTimer = null;
+    elements.progress.hidden = true;
+  }
+
+  function warnBeforeUnload(event) {
+    event.preventDefault();
+    event.returnValue = '';
+  }
+
+  async function uploadWithProgress(file) {
+    activeUpload = new AbortController();
+    const startedAt = performance.now();
+    showProgress(file);
+    try {
+      return await uploadFile(file, {
+        signal: activeUpload.signal,
+        onProgress: (progress) => updateProgress(file, startedAt, progress),
+        onSent: showSaving,
+      });
+    } finally {
+      activeUpload = null;
+    }
+  }
+
+  function belongsInImageTray(file) {
+    // An image too big for the image tray is stored here as an ordinary file instead.
+    return IMAGE_MIME_TYPES.has(file.type) && file.size <= imageSizeLimitBytes;
+  }
+
   async function uploadFiles(fileList) {
-    hideInlineMessage(elements.errorMessage);
+    if (!busy) hideInlineMessage(elements.errorMessage);
     const incoming = Array.from(fileList || []);
-    const images = incoming.filter((file) => IMAGE_MIME_TYPES.has(file.type));
-    const otherFiles = incoming.filter((file) => !IMAGE_MIME_TYPES.has(file.type));
+    const images = incoming.filter(belongsInImageTray);
+    const otherFiles = incoming.filter((file) => !belongsInImageTray(file));
+    uploadQueue.push(...otherFiles);
+    queuedTotal += otherFiles.length;
     if (images.length && onImageFiles) await onImageFiles(images);
-    if (!otherFiles.length) return;
+    // Files added while an upload is running join the queue that the running loop drains.
+    if (busy || !uploadQueue.length) return;
 
     busy = true;
     updateActions();
     updateCapacity();
-    for (const file of otherFiles) {
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    while (uploadQueue.length) {
+      const file = uploadQueue.shift();
+      queuedDone += 1;
       if (files.length >= fileCountLimit) {
         showInlineMessage(elements.limitMessage, `The ${fileCountLimit}-file limit has been reached. Delete a file to upload another.`);
         break;
@@ -163,17 +249,27 @@ export function createFilePanel(elements, { onImageFiles, onChanged } = {}) {
         continue;
       }
       try {
-        const result = await uploadFile(file);
-        files = [...files, result.file];
+        const result = await uploadWithProgress(file);
+        // The realtime refresh can land before this response, so never add the file twice.
+        files = [...files.filter((entry) => entry.id !== result.file.id), result.file];
         render();
         updateCapacity();
         announce(`${file.name} uploaded`);
       } catch (error) {
+        if (error?.code === 'UPLOAD_CANCELLED') {
+          announce(`Upload of ${file.name} cancelled`);
+          break;
+        }
         const message = error instanceof ApiError ? error.message : 'Upload failed.';
         showInlineMessage(elements.errorMessage, `“${file.name}” was not uploaded: ${message}`);
         if (error?.code === 'FILE_LIMIT_REACHED') break;
       }
     }
+    uploadQueue.length = 0;
+    queuedTotal = 0;
+    queuedDone = 0;
+    hideProgress();
+    window.removeEventListener('beforeunload', warnBeforeUnload);
     busy = false;
     updateActions();
     updateCapacity();
@@ -224,6 +320,10 @@ export function createFilePanel(elements, { onImageFiles, onChanged } = {}) {
   elements.deleteCancelButton.addEventListener('click', () => {
     pendingDeleteId = null;
     hidePanel(elements.deletePanel);
+  });
+  elements.cancelButton.addEventListener('click', () => {
+    uploadQueue.length = 0;
+    activeUpload?.abort();
   });
   elements.fileInput.addEventListener('change', (event) => {
     if (event.target.files?.length) uploadFiles(event.target.files);

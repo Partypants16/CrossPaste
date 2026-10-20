@@ -27,7 +27,7 @@ function loadConfig() {
   const imageSizeLimitMb = parseIntEnv('IMAGE_SIZE_LIMIT_MB', 10, { min: 1, max: 200 });
   const imageMaxDimension = parseIntEnv('IMAGE_MAX_DIMENSION', 2000, { min: 200, max: 10000 });
   const fileCountLimit = parseIntEnv('FILE_COUNT_LIMIT', 10, { min: 1, max: 200 });
-  const fileSizeLimitMb = parseIntEnv('FILE_SIZE_LIMIT_MB', 25, { min: 1, max: 500 });
+  const fileSizeLimitMb = parseIntEnv('FILE_SIZE_LIMIT_MB', 200, { min: 1, max: 500 });
 
   const autosaveDelayMs = parseIntEnv('AUTOSAVE_DELAY_MS', 800, { min: 100, max: 10000 });
 
@@ -40,6 +40,8 @@ function loadConfig() {
   const uploadDirectory = path.resolve(process.env.UPLOAD_DIRECTORY || path.join(dataDirectory, 'uploads'));
   const thumbnailDirectory = path.resolve(process.env.THUMBNAIL_DIRECTORY || path.join(dataDirectory, 'thumbnails'));
   const filesDirectory = path.resolve(process.env.FILES_DIRECTORY || path.join(dataDirectory, 'files'));
+  // Shared-file uploads stream here first and are moved into filesDirectory once accepted.
+  const incomingDirectory = path.join(dataDirectory, 'incoming');
 
   const optionalAccessToken = process.env.OPTIONAL_ACCESS_TOKEN || '';
   const contentExpiryHours = parseIntEnv('CONTENT_EXPIRY_HOURS', 0, { min: 0, max: 8760 });
@@ -78,6 +80,7 @@ function loadConfig() {
     uploadDirectory,
     thumbnailDirectory,
     filesDirectory,
+    incomingDirectory,
     databasePath: path.join(dataDirectory, 'crosspaste.db'),
     optionalAccessToken,
     accessTokenEnabled: optionalAccessToken.trim().length > 0,

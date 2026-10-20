@@ -21,8 +21,10 @@ between your own devices.
 - Autosave with conflict detection — no accidental overwrites between devices.
 - Up to 10 shared images (PNG, JPEG, WebP, animated GIF), with thumbnails, download,
   and clipboard copy.
-- Up to 10 shared files of any type (up to 25 MB each by default), with upload,
-  drag-and-drop, download, and delete.
+- Up to 10 shared files of any type (up to 200 MB each by default), with upload,
+  drag-and-drop, download, and delete. Larger uploads show a progress bar (with
+  speed, time left, and a Cancel button), and images too big for the image tray
+  are kept as ordinary files instead.
 - Real-time sync across every open device via Server-Sent Events.
 - Works over plain HTTP on your LAN; optional internal HTTPS for full clipboard-button
   support.
@@ -525,7 +527,7 @@ All in `.env` (see that file for full descriptions), then `docker compose up -d`
 | `IMAGE_SIZE_LIMIT_MB` | `10` | Maximum accepted upload size per image |
 | `IMAGE_MAX_DIMENSION` | `2000` | Longest-side resize target in pixels (GIFs exempt) |
 | `FILE_COUNT_LIMIT` | `10` | Maximum files stored at once, globally |
-| `FILE_SIZE_LIMIT_MB` | `25` | Maximum accepted upload size per file |
+| `FILE_SIZE_LIMIT_MB` | `200` | Maximum accepted upload size per file (at most `500`) |
 | `AUTOSAVE_DELAY_MS` | `800` | Debounce delay before autosaving text |
 | `WRITE_RATE_LIMIT_MAX` / `_WINDOW_MS` | `120` / `60000` | Text-save rate limit |
 | `UPLOAD_RATE_LIMIT_MAX` / `_WINDOW_MS` | `20` / `60000` | Image/file-upload rate limit |
@@ -569,6 +571,12 @@ section 34) than application-level.
 
 - Images are capped by count (`IMAGE_COUNT_LIMIT`) and per-file size
   (`IMAGE_SIZE_LIMIT_MB`), so image storage has a known upper bound.
+- Shared files are capped the same way (`FILE_COUNT_LIMIT` x `FILE_SIZE_LIMIT_MB`),
+  which is 2 GB with the defaults.
+- Shared-file uploads stream to `./data/incoming/` and are moved into `./data/files/`
+  once accepted, so they never sit in memory. A cancelled or failed upload removes its
+  partial file straight away, and anything left behind by a crash is removed the next
+  time the app starts.
 - Old backups accumulate in `./backups/` — CrossPaste does not delete old backups
   automatically; periodically prune ones you no longer need.
 - Check usage on the Ubuntu Server with:

@@ -198,6 +198,15 @@
       <div id="file-limit-message" class="inline-message inline-message--warning" hidden role="alert"></div>
       <div id="file-error-message" class="inline-message inline-message--error" hidden role="alert"></div>
 
+      <div id="file-upload-progress" class="upload-progress" hidden>
+        <div class="upload-progress__header">
+          <span id="file-upload-name" class="upload-progress__name"></span>
+          <button type="button" class="button button--ghost upload-progress__cancel" id="file-upload-cancel">Cancel</button>
+        </div>
+        <progress id="file-upload-bar" class="upload-progress__bar" max="100" value="0" aria-labelledby="file-upload-name"></progress>
+        <p id="file-upload-detail" class="upload-progress__detail"></p>
+      </div>
+
       <div id="file-dropzone" class="image-dropzone">
         <ul id="file-list" class="file-grid" aria-label="Stored files"></ul>
         <p id="file-empty-state" class="file-empty-state">No files yet. Upload or drag one here.</p>

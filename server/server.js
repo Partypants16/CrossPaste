@@ -4,9 +4,19 @@ import { logger } from './utilities/logger.js';
 import { closeDatabase } from './database.js';
 import { startHeartbeat, closeAllConnections } from './services/realtime-service.js';
 import { runExpiryCleanup, startExpiryScheduler, stopExpiryScheduler } from './services/cleanup-service.js';
+import { clearIncomingUploads } from './services/file-service.js';
+
+// Node's default requestTimeout (5 minutes) would cut off a large file upload over a
+// slow Wi-Fi or VPN link: 200 MB in 5 minutes needs about 5.5 Mbit/s sustained.
+const REQUEST_TIMEOUT_MS = 60 * 60 * 1000;
 
 async function main() {
   const app = await createApp();
+
+  const abandonedUploads = await clearIncomingUploads();
+  if (abandonedUploads > 0) {
+    logger.info('Removed partial uploads left from a previous run', { count: abandonedUploads });
+  }
 
   const server = app.listen(config.appPort, config.appHost, () => {
     logger.info('CrossPaste server started', {
@@ -15,6 +25,7 @@ async function main() {
       nodeEnv: config.nodeEnv,
     });
   });
+  server.requestTimeout = REQUEST_TIMEOUT_MS;
 
   const heartbeatTimer = startHeartbeat();
   startExpiryScheduler();

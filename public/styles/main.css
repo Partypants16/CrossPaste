@@ -686,3 +686,72 @@ body {
   color: var(--color-danger);
   border-color: var(--color-danger);
 }
+
+/* File upload progress */
+
+.upload-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  background: var(--color-panel);
+}
+.upload-progress[hidden] {
+  display: none;
+}
+
+.upload-progress__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.upload-progress__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-progress__cancel {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: 13px;
+}
+
+.upload-progress__bar {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 8px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+.upload-progress__bar::-webkit-progress-bar {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+.upload-progress__bar::-webkit-progress-value {
+  background: var(--color-accent);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.upload-progress__bar::-moz-progress-bar {
+  background: var(--color-accent);
+  border-radius: 999px;
+}
+
+.upload-progress__detail {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

@@ -20,6 +20,17 @@ export function sanitiseOriginalFilename(originalName) {
   return cleaned.length > 0 ? cleaned : 'upload';
 }
 
+export async function moveFile(sourcePath, destinationPath) {
+  try {
+    await fs.rename(sourcePath, destinationPath);
+  } catch (error) {
+    // rename() cannot cross filesystems, e.g. if FILES_DIRECTORY is mounted separately.
+    if (error.code !== 'EXDEV') throw error;
+    await fs.copyFile(sourcePath, destinationPath);
+    await fs.unlink(sourcePath);
+  }
+}
+
 export async function deleteFileIfExists(filePath) {
   try {
     await fs.unlink(filePath);

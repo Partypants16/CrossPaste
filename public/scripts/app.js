@@ -265,6 +265,11 @@ const filePanel = createFilePanel(
     deleteFilename: document.getElementById('delete-file-name'),
     deleteConfirmButton: document.getElementById('delete-file-confirm'),
     deleteCancelButton: document.getElementById('delete-file-cancel'),
+    progress: document.getElementById('file-upload-progress'),
+    progressName: document.getElementById('file-upload-name'),
+    progressBar: document.getElementById('file-upload-bar'),
+    progressDetail: document.getElementById('file-upload-detail'),
+    cancelButton: document.getElementById('file-upload-cancel'),
   },
   {
     onImageFiles: (images) => imagePanel.uploadFiles(images),

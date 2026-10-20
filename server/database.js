@@ -11,6 +11,7 @@ export async function openDatabase() {
   await ensureDirectory(config.uploadDirectory);
   await ensureDirectory(config.thumbnailDirectory);
   await ensureDirectory(config.filesDirectory);
+  await ensureDirectory(config.incomingDirectory);
 
   db = new Database(config.databasePath);
   db.pragma('journal_mode = WAL');
