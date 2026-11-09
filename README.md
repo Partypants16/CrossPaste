@@ -21,7 +21,7 @@ between your own devices.
 - Autosave with conflict detection — no accidental overwrites between devices.
 - Up to 10 shared images (PNG, JPEG, WebP, animated GIF), with thumbnails, download,
   and clipboard copy.
-- Up to 10 shared files of any type (up to 200 MB each by default), with upload,
+- Up to 10 shared files of any type (up to 500 MB each by default), with upload,
   drag-and-drop, download, and delete. Larger uploads show a progress bar (with
   speed, time left, and a Cancel button), and images too big for the image tray
   are kept as ordinary files instead.
@@ -527,7 +527,7 @@ All in `.env` (see that file for full descriptions), then `docker compose up -d`
 | `IMAGE_SIZE_LIMIT_MB` | `10` | Maximum accepted upload size per image |
 | `IMAGE_MAX_DIMENSION` | `2000` | Longest-side resize target in pixels (GIFs exempt) |
 | `FILE_COUNT_LIMIT` | `10` | Maximum files stored at once, globally |
-| `FILE_SIZE_LIMIT_MB` | `200` | Maximum accepted upload size per file (at most `500`) |
+| `FILE_SIZE_LIMIT_MB` | `500` | Maximum accepted upload size per file (at most `500`) |
 | `AUTOSAVE_DELAY_MS` | `800` | Debounce delay before autosaving text |
 | `WRITE_RATE_LIMIT_MAX` / `_WINDOW_MS` | `120` / `60000` | Text-save rate limit |
 | `UPLOAD_RATE_LIMIT_MAX` / `_WINDOW_MS` | `20` / `60000` | Image/file-upload rate limit |

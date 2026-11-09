@@ -27,7 +27,7 @@ function loadConfig() {
   const imageSizeLimitMb = parseIntEnv('IMAGE_SIZE_LIMIT_MB', 10, { min: 1, max: 200 });
   const imageMaxDimension = parseIntEnv('IMAGE_MAX_DIMENSION', 2000, { min: 200, max: 10000 });
   const fileCountLimit = parseIntEnv('FILE_COUNT_LIMIT', 10, { min: 1, max: 200 });
-  const fileSizeLimitMb = parseIntEnv('FILE_SIZE_LIMIT_MB', 200, { min: 1, max: 500 });
+  const fileSizeLimitMb = parseIntEnv('FILE_SIZE_LIMIT_MB', 500, { min: 1, max: 500 });
 
   const autosaveDelayMs = parseIntEnv('AUTOSAVE_DELAY_MS', 800, { min: 100, max: 10000 });
 
