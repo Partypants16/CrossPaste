@@ -8,6 +8,12 @@
 # trust that certificate on each device.
 {
 	auto_https disable_redirects
+	# HTTP/3 (QUIC) needs UDP 443, which compose.yaml doesn't publish. Without this,
+	# Caddy still advertises h3 via Alt-Svc and browsers can stall trying it before
+	# falling back to TCP. h1/h2 are all a LAN needs.
+	servers {
+		protocols h1 h2
+	}
 }
 
 :80 {
