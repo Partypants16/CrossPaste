@@ -26,6 +26,26 @@ between your own devices.
   speed, time left, and a Cancel button), and images too big for the image tray
   are kept as ordinary files instead.
 - Real-time sync across every open device via Server-Sent Events.
+- **History** of the shared text: every earlier version is kept (pinned first, newest
+  next) and can be copied, pinned, deleted, or brought back with **Use**. Typing in
+  the same text updates one entry; pasting something new starts another. Old entries
+  are cleaned up automatically (last 200, up to 30 days by default; pinned ones never).
+- **Search** across the text history, image and file names, and the text inside
+  images, from the History drawer.
+- **Pins** on text, images and files: pinned items are never removed by any cleanup.
+- **Text in images (OCR):** the server reads the text in every shared image
+  (screenshots, photos of notes) in the background with tesseract.js, using an English
+  model that ships with the app, so nothing is downloaded and no image leaves the
+  server. **Text** on an image shows it, with Copy and "Add to Shared Text".
+- **Links and colours** in the text get buttons under the editor: open a link (one tap
+  on a phone), show it as a QR code, or copy it; colours get a swatch and HEX/RGB copy.
+- **QR codes** of the text or a link (toolbar **QR**), or of the page address, so a
+  phone can open CrossPaste by scanning the laptop's screen.
+- **Copy Plain** copies the text without formatting.
+- **Device names**: each browser has a name (header button, e.g. "Laptop", "Phone"),
+  shown next to the text, images and files it shares. It's a label, not a login.
+- **Install as an app + share menu** (HTTPS only, see section 23a): on Android, "Share →
+  CrossPaste" from any app sends text, links, photos and files straight in.
 - Works over plain HTTP on your LAN; optional internal HTTPS for full clipboard-button
   support.
 - No accounts. Optionally, a single shared access token if you want a light gate.
@@ -396,6 +416,24 @@ plain HTTP, clicking them will show a short inline message asking you to use the
 keyboard shortcut instead — this is expected, not a bug. Internal HTTPS (section 20)
 resolves this.
 
+## 23a. Installing as an app (phone share menu)
+
+CrossPaste can be installed to the home screen, and then appears in Android's share
+menu: sharing text or a link replaces the shared text (the old text stays in History),
+shared images go to the image tray, other files to the file tray, and the page opens
+saying what arrived.
+
+Browsers only allow this over HTTPS with a trusted certificate:
+
+1. Set up internal HTTPS (section 20) and trust the certificate on the phone (section 22).
+2. Open `https://<hostname or IP>/` in Chrome on the phone.
+3. Menu → **Add to Home screen** → **Install**.
+4. In any app, Share → **CrossPaste**.
+
+Over plain HTTP everything else still works; only installing (and so the share menu)
+is unavailable. Copy buttons fall back to the older copy command over HTTP, and the
+image-text dialog always shows the text so it can be selected by hand.
+
 ## 24. Configuring UFW for LAN and VPN access
 
 CrossPaste's own Docker networking does not depend on your host firewall, but you
@@ -514,7 +552,9 @@ CONTENT_EXPIRY_HOURS=24
 then `docker compose up -d` to apply it. `0` (the default) disables this feature
 entirely. When enabled, cleanup runs once at startup and then periodically; it never
 runs two cleanup passes concurrently, and every device is notified in real time when
-content is cleared this way.
+content is cleared this way. **Pinned images and files are never expired.** Text
+history has its own limits (`HISTORY_MAX_ITEMS`, `HISTORY_MAX_DAYS`, section 31), which
+always apply and never remove pinned entries.
 
 ## 31. Changing limits
 
@@ -531,6 +571,10 @@ All in `.env` (see that file for full descriptions), then `docker compose up -d`
 | `AUTOSAVE_DELAY_MS` | `800` | Debounce delay before autosaving text |
 | `WRITE_RATE_LIMIT_MAX` / `_WINDOW_MS` | `120` / `60000` | Text-save rate limit |
 | `UPLOAD_RATE_LIMIT_MAX` / `_WINDOW_MS` | `20` / `60000` | Image/file-upload rate limit |
+| `HISTORY_MAX_ITEMS` | `200` | Unpinned text-history entries kept (`0` = no limit) |
+| `HISTORY_MAX_DAYS` | `30` | Unpinned text-history entries older than this are removed (`0` = keep) |
+| `HISTORY_MERGE_SECONDS` | `120` | Edits within this time, from the same device, update one history entry |
+| `OCR_ENABLED` | `1` | Read text in shared images on the server (`0` = off; uses about 100 MB while reading) |
 
 ## 32. Troubleshooting
 

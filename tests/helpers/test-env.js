@@ -18,6 +18,8 @@ export async function setupTestEnvironment(overrides = {}) {
   process.env.LOG_LEVEL = 'error';
   process.env.OPTIONAL_ACCESS_TOKEN = '';
   process.env.CONTENT_EXPIRY_HOURS = '0';
+  // Reading text from images is slow, so only the OCR test switches it on.
+  process.env.OCR_ENABLED = '0';
 
   for (const [key, value] of Object.entries(overrides)) {
     process.env[key] = String(value);

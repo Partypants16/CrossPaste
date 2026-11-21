@@ -8,6 +8,7 @@ import {
   ImageNotFoundError,
 } from '../services/image-service.js';
 import { FileTooLargeError, FileLimitReachedError, FileNotFoundError } from '../services/file-service.js';
+import { HistoryNotFoundError } from '../services/history-service.js';
 
 const ERROR_STATUS_MAP = new Map([
   [ValidationError, 400],
@@ -20,6 +21,7 @@ const ERROR_STATUS_MAP = new Map([
   [FileTooLargeError, 413],
   [FileLimitReachedError, 409],
   [FileNotFoundError, 404],
+  [HistoryNotFoundError, 404],
 ]);
 
 function respond(res, status, code, message, extra) {
@@ -50,6 +52,9 @@ export function errorHandler(error, req, res, _next) {
       }
       if (error instanceof FileLimitReachedError) {
         return respond(res, status, 'FILE_LIMIT_REACHED', error.message);
+      }
+      if (error instanceof HistoryNotFoundError) {
+        return respond(res, status, 'HISTORY_NOT_FOUND', error.message);
       }
       if (error instanceof FileNotFoundError) {
         return respond(res, status, 'FILE_NOT_FOUND', error.message);

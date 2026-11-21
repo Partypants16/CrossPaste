@@ -6,6 +6,7 @@ import { deleteFileIfExists } from '../utilities/files.js';
 import { expireClipboardIfOlderThan } from './clipboard-service.js';
 import { expireOldFiles } from './file-service.js';
 import { broadcast } from './realtime-service.js';
+import { trimHistory } from './history-service.js';
 
 const CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -14,7 +15,7 @@ let intervalHandle = null;
 
 async function expireOldImages(cutoffIso) {
   const db = getDatabase();
-  const expired = db.prepare('SELECT * FROM images WHERE created_at < ?').all(cutoffIso);
+  const expired = db.prepare('SELECT * FROM images WHERE created_at < ? AND pinned = 0').all(cutoffIso);
   if (expired.length === 0) return 0;
 
   const deleteRows = db.transaction((rows) => {
@@ -35,15 +36,23 @@ async function expireOldImages(cutoffIso) {
 }
 
 /**
- * Automatic expiry is opt-in (CONTENT_EXPIRY_HOURS=0 disables it) and never overlaps
- * itself, since a slow cleanup run and a timer tick could otherwise race.
+ * History trimming (HISTORY_MAX_ITEMS / HISTORY_MAX_DAYS) always runs. Expiry of the
+ * live text, images and files is opt-in (CONTENT_EXPIRY_HOURS=0 disables it) and never
+ * touches pinned items. Runs never overlap, since a slow run and a timer tick could race.
  */
 export async function runExpiryCleanup() {
-  if (!config.contentExpiryEnabled) return;
   if (cleanupInProgress) return;
 
   cleanupInProgress = true;
   try {
+    const trimmedHistory = trimHistory();
+    if (trimmedHistory > 0) {
+      broadcast('history-changed', { reason: 'trimmed' });
+      logger.info('History cleanup removed old entries', { removed: trimmedHistory });
+    }
+
+    if (!config.contentExpiryEnabled) return;
+
     const cutoff = new Date(Date.now() - config.contentExpiryHours * 60 * 60 * 1000).toISOString();
 
     const expiredClipboard = expireClipboardIfOlderThan(cutoff);
@@ -74,7 +83,6 @@ export async function runExpiryCleanup() {
 }
 
 export function startExpiryScheduler() {
-  if (!config.contentExpiryEnabled) return null;
   intervalHandle = setInterval(() => {
     runExpiryCleanup();
   }, CLEANUP_INTERVAL_MS);

@@ -142,3 +142,53 @@ export function deleteFileRequest(id) {
 export function fileDownloadUrl(id) {
   return `/api/files/${encodeURIComponent(id)}/download`;
 }
+
+function postJson(path, payload) {
+  return request(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload ?? {}),
+  });
+}
+
+// History of the shared text
+
+export function fetchHistory({ query = '', limit = 100 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (query) params.set('q', query);
+  return request(`/api/history?${params}`);
+}
+
+export function pinHistoryEntry(id, pinned) {
+  return postJson(`/api/history/${encodeURIComponent(id)}/pin`, { pinned });
+}
+
+export function restoreHistoryEntry(id) {
+  return postJson(`/api/history/${encodeURIComponent(id)}/restore`);
+}
+
+export function deleteHistoryEntry(id) {
+  return request(`/api/history/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export function clearUnpinnedHistory() {
+  return postJson('/api/history/clear');
+}
+
+export function search(query) {
+  return request(`/api/search?${new URLSearchParams({ q: query })}`);
+}
+
+// Pins and text read from images
+
+export function pinImage(id, pinned) {
+  return postJson(`/api/images/${encodeURIComponent(id)}/pin`, { pinned });
+}
+
+export function pinFile(id, pinned) {
+  return postJson(`/api/files/${encodeURIComponent(id)}/pin`, { pinned });
+}
+
+export function fetchImageText(id, { retry = false } = {}) {
+  return request(`/api/images/${encodeURIComponent(id)}/text${retry ? '?retry=1' : ''}`);
+}

@@ -5,6 +5,7 @@ import { closeDatabase } from './database.js';
 import { startHeartbeat, closeAllConnections } from './services/realtime-service.js';
 import { runExpiryCleanup, startExpiryScheduler, stopExpiryScheduler } from './services/cleanup-service.js';
 import { clearIncomingUploads } from './services/file-service.js';
+import { queuePendingImages, shutdownOcr } from './services/ocr-service.js';
 
 // Node's default requestTimeout (5 minutes) would cut off a large file upload over a
 // slow Wi-Fi or VPN link: 200 MB in 5 minutes needs about 5.5 Mbit/s sustained.
@@ -31,6 +32,11 @@ async function main() {
   startExpiryScheduler();
   await runExpiryCleanup();
 
+  const waitingImages = queuePendingImages();
+  if (waitingImages > 0) {
+    logger.info('Reading text from images in the background', { count: waitingImages });
+  }
+
   let shuttingDown = false;
   async function shutdown(signal) {
     if (shuttingDown) return;
@@ -40,6 +46,7 @@ async function main() {
     clearInterval(heartbeatTimer);
     stopExpiryScheduler();
     closeAllConnections();
+    shutdownOcr();
 
     server.close(() => {
       closeDatabase();

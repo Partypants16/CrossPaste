@@ -1,16 +1,22 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import multer from 'multer';
 import path from 'node:path';
 import { config } from '../config.js';
 import { uploadRateLimiter } from '../middleware/rate-limits.js';
 import { broadcast } from '../services/realtime-service.js';
 import { logger } from '../utilities/logger.js';
+import { getDeviceName } from '../utilities/device.js';
+import { validatePinPayload, parseId } from '../middleware/validation.js';
+import { writeRateLimiter } from '../middleware/rate-limits.js';
+import { noCacheForMutableData } from '../middleware/security.js';
+import { queueImageText, getImageText } from '../services/ocr-service.js';
 import {
   storeImage,
   listImages,
   getImageById,
   getImageRowById,
   deleteImage,
+  setImagePinned,
   ImageNotFoundError,
 } from '../services/image-service.js';
 
@@ -32,8 +38,13 @@ imagesRouter.post('/images', uploadRateLimiter, upload.single('image'), async (r
     if (!req.file) {
       return res.status(400).json({ error: { code: 'MISSING_FILE', message: 'No image file was provided.' } });
     }
-    const image = await storeImage({ buffer: req.file.buffer, originalFilename: req.file.originalname });
+    const image = await storeImage({
+      buffer: req.file.buffer,
+      originalFilename: req.file.originalname,
+      deviceName: getDeviceName(req),
+    });
     broadcast('images-changed', { reason: 'uploaded', imageId: image.id });
+    queueImageText(image.id);
     logger.info('Image uploaded', { imageId: image.id, mimeType: image.mimeType });
     res.status(201).json({ image });
   } catch (error) {
@@ -88,6 +99,27 @@ imagesRouter.delete('/images/:id', async (req, res, next) => {
     broadcast('images-changed', { reason: 'deleted', imageId: result.id });
     logger.info('Image deleted', { imageId: result.id });
     res.json({ ok: true, id: result.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+imagesRouter.post('/images/:id/pin', express.json({ limit: '2kb' }), writeRateLimiter, noCacheForMutableData, (req, res, next) => {
+  try {
+    const { pinned } = validatePinPayload(req.body);
+    const image = setImagePinned(parseId(req.params.id), pinned);
+    broadcast('images-changed', { reason: pinned ? 'pinned' : 'unpinned', imageId: image.id });
+    res.json({ image });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// The text read from the image. Waits if it is still being read; ?retry=1 re-reads a failed one.
+imagesRouter.get('/images/:id/text', noCacheForMutableData, async (req, res, next) => {
+  try {
+    const result = await getImageText(parseId(req.params.id), { retry: req.query.retry === '1' });
+    res.json(result);
   } catch (error) {
     next(error);
   }

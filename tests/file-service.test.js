@@ -70,6 +70,8 @@ test('storeFile writes the bytes to disk and persists sanitised metadata', async
     sizeBytes: buffer.length,
     sortOrder: 0,
     createdAt: file.createdAt,
+    uploadedBy: null,
+    pinned: false,
   });
   assert.match(file.createdAt, /^\d{4}-\d{2}-\d{2}T/);
 

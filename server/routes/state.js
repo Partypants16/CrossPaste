@@ -22,6 +22,10 @@ stateRouter.get('/state', (_req, res) => {
     },
     settings: {
       autosaveDelayMs: config.autosaveDelayMs,
+      ocrEnabled: config.ocrEnabled,
+      historyMaxItems: config.historyMaxItems,
+      historyMaxDays: config.historyMaxDays,
+      contentExpiryHours: config.contentExpiryHours,
     },
   });
 });

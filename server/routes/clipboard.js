@@ -5,14 +5,16 @@ import { writeRateLimiter } from '../middleware/rate-limits.js';
 import { noCacheForMutableData } from '../middleware/security.js';
 import { broadcast } from '../services/realtime-service.js';
 import { logger } from '../utilities/logger.js';
+import { getDeviceName } from '../utilities/device.js';
 
 export const clipboardRouter = Router();
 
 clipboardRouter.put('/clipboard', writeRateLimiter, noCacheForMutableData, (req, res, next) => {
   try {
     const { html, baseRevision } = validateClipboardPayload(req.body);
-    const saved = saveClipboard({ html, baseRevision, force: false });
+    const saved = saveClipboard({ html, baseRevision, force: false, deviceName: getDeviceName(req) });
     broadcast('text-updated', saved);
+    broadcast('history-changed', { reason: 'saved' });
     logger.info('Clipboard text saved', { revision: saved.revision });
     res.json({ clipboard: saved });
   } catch (error) {
@@ -23,8 +25,9 @@ clipboardRouter.put('/clipboard', writeRateLimiter, noCacheForMutableData, (req,
 clipboardRouter.post('/clipboard/force', writeRateLimiter, noCacheForMutableData, (req, res, next) => {
   try {
     const { html } = validateForceClipboardPayload(req.body);
-    const saved = saveClipboard({ html, baseRevision: null, force: true });
+    const saved = saveClipboard({ html, baseRevision: null, force: true, deviceName: getDeviceName(req) });
     broadcast('text-updated', saved);
+    broadcast('history-changed', { reason: 'saved' });
     logger.info('Clipboard text force-saved', { revision: saved.revision });
     res.json({ clipboard: saved });
   } catch (error) {
@@ -32,9 +35,9 @@ clipboardRouter.post('/clipboard/force', writeRateLimiter, noCacheForMutableData
   }
 });
 
-clipboardRouter.post('/clipboard/clear', writeRateLimiter, noCacheForMutableData, (_req, res, next) => {
+clipboardRouter.post('/clipboard/clear', writeRateLimiter, noCacheForMutableData, (req, res, next) => {
   try {
-    const cleared = clearClipboard();
+    const cleared = clearClipboard({ deviceName: getDeviceName(req) });
     broadcast('text-updated', cleared);
     logger.info('Clipboard text cleared', { revision: cleared.revision });
     res.json({ clipboard: cleared });

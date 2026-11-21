@@ -86,3 +86,40 @@ export function hideInlineMessage(element) {
   element.hidden = true;
   element.textContent = '';
 }
+
+/** "just now", "5 min ago", "yesterday 14:05", or a date for anything older. */
+export function formatRelativeTime(isoTimestamp, now = Date.now()) {
+  const date = new Date(isoTimestamp);
+  const time = date.getTime();
+  if (Number.isNaN(time)) return '';
+  const seconds = Math.round((now - time) / 1000);
+  if (seconds < 45) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  const clock = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (hours < 12) return `${hours} h ago`;
+  const today = new Date(now);
+  const yesterday = new Date(now - 24 * 60 * 60 * 1000);
+  if (date.toDateString() === today.toDateString()) return `today ${clock}`;
+  if (date.toDateString() === yesterday.toDateString()) return `yesterday ${clock}`;
+  return date.toLocaleDateString([], { day: 'numeric', month: 'short', year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+}
+
+/** Small helper for building DOM without innerHTML: el('button', { className, onClick }, 'Text'). */
+export function el(tag, props = {}, ...children) {
+  const element = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (value == null || value === false) continue;
+    if (key === 'className') element.className = value;
+    else if (key === 'onClick') element.addEventListener('click', value);
+    else if (key === 'dataset') Object.assign(element.dataset, value);
+    else if (key in element && typeof value !== 'string') element[key] = value;
+    else element.setAttribute(key, value === true ? '' : value);
+  }
+  for (const child of children.flat()) {
+    if (child == null || child === false) continue;
+    element.append(child instanceof Node ? child : String(child));
+  }
+  return element;
+}

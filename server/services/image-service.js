@@ -102,7 +102,7 @@ async function processGif(buffer) {
  * declared Content-Type), rejects anything outside the documented allow-list,
  * resizes/strips-metadata for static formats, and preserves GIF animation untouched.
  */
-export async function storeImage({ buffer, originalFilename }) {
+export async function storeImage({ buffer, originalFilename, deviceName = null }) {
   if (buffer.length > config.imageSizeLimitBytes) {
     throw new ImageTooLargeError(buffer.length);
   }
@@ -134,8 +134,9 @@ export async function storeImage({ buffer, originalFilename }) {
     const result = db
       .prepare(
         `INSERT INTO images
-          (stored_filename, thumbnail_filename, original_filename, mime_type, size_bytes, width, height, sort_order, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          (stored_filename, thumbnail_filename, original_filename, mime_type, size_bytes, width, height, sort_order, created_at,
+           uploaded_by, ocr_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         storedFilename,
@@ -146,7 +147,9 @@ export async function storeImage({ buffer, originalFilename }) {
         processed.width ?? null,
         processed.height ?? null,
         nextSortOrder,
-        timestamp
+        timestamp,
+        deviceName,
+        config.ocrEnabled ? 'pending' : 'skipped'
       );
     return result.lastInsertRowid;
   });
@@ -222,5 +225,16 @@ function toPublicShape(row) {
     height: row.height,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
+    uploadedBy: row.uploaded_by ?? null,
+    pinned: row.pinned === 1,
+    textStatus: row.ocr_status,
+    hasText: row.ocr_status === 'done' && Boolean(row.ocr_text && row.ocr_text.trim()),
   };
+}
+
+export function setImagePinned(id, pinned) {
+  const db = getDatabase();
+  const result = db.prepare('UPDATE images SET pinned = ? WHERE id = ?').run(pinned ? 1 : 0, id);
+  if (result.changes === 0) throw new ImageNotFoundError();
+  return getImageById(id);
 }

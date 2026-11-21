@@ -28,6 +28,10 @@ function connect() {
     listeners.onFilesChanged(JSON.parse(event.data));
   });
 
+  eventSource.addEventListener('history-changed', (event) => {
+    listeners.onHistoryChanged?.(JSON.parse(event.data));
+  });
+
   eventSource.onerror = () => {
     listeners.onDisconnected();
     teardown();

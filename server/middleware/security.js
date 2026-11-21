@@ -53,7 +53,15 @@ export function accessTokenGate(req, res, next) {
 
   const isApiRequest = req.path.startsWith('/api/');
   const allowedWithoutAuth =
-    req.path === '/api/access/verify' || req.path === '/access.html' || req.path.startsWith('/styles/') || req.path.startsWith('/scripts/') || req.path === '/favicon.svg';
+    req.path === '/api/access/verify' ||
+    req.path === '/access.html' ||
+    req.path.startsWith('/styles/') ||
+    req.path.startsWith('/scripts/') ||
+    req.path.startsWith('/icons/') ||
+    req.path.startsWith('/vendor/') ||
+    req.path === '/favicon.svg' ||
+    req.path === '/manifest.webmanifest' ||
+    req.path === '/sw.js';
 
   if (allowedWithoutAuth) return next();
 

@@ -33,3 +33,19 @@ export function validateForceClipboardPayload(body) {
   }
   return { html: body.html };
 }
+
+export function validatePinPayload(body) {
+  assertOnlyKeys(body, ['pinned']);
+  if (typeof body.pinned !== 'boolean') {
+    throw new ValidationError('"pinned" must be true or false');
+  }
+  return { pinned: body.pinned };
+}
+
+export function parseId(raw) {
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new ValidationError('The id must be a positive whole number');
+  }
+  return id;
+}

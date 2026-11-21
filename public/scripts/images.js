@@ -4,10 +4,12 @@ import {
   imageFileUrl,
   imageThumbnailUrl,
   imageDownloadUrl,
+  pinImage,
   ApiError,
 } from './api.js';
 import { copyImageBlob } from './clipboard.js';
-import { showInlineMessage, hideInlineMessage, showPanel, hidePanel, announce } from './ui.js';
+import { showInlineMessage, hideInlineMessage, showPanel, hidePanel, announce, formatRelativeTime } from './ui.js';
+import { deviceIcon } from './device.js';
 
 const ALLOWED_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
@@ -21,7 +23,7 @@ function formatTimestamp(isoTimestamp) {
   return new Date(isoTimestamp).toLocaleString();
 }
 
-export function createImagePanel(elements) {
+export function createImagePanel(elements, { onShowText } = {}) {
   let images = [];
   let selectedImageId = null;
   let imageCountLimit = 10;
@@ -35,6 +37,10 @@ export function createImagePanel(elements) {
     elements.copyButton.disabled = !selected;
     elements.downloadButton.disabled = !selected;
     elements.deleteButton.disabled = !selected;
+    elements.textButton.disabled = !selected;
+    elements.pinButton.disabled = !selected;
+    elements.pinButton.setAttribute('aria-pressed', String(Boolean(selected?.pinned)));
+    elements.pinButtonLabel.textContent = selected?.pinned ? 'Unpin' : 'Pin';
   }
 
   function updateCapacityUi() {
@@ -87,8 +93,17 @@ export function createImagePanel(elements) {
       const detailsEl = document.createElement('span');
       detailsEl.textContent = `${image.mimeType.replace('image/', '').toUpperCase()} · ${formatBytes(image.sizeBytes)}`;
       const timeEl = document.createElement('span');
-      timeEl.textContent = formatTimestamp(image.createdAt);
+      timeEl.textContent = [formatRelativeTime(image.createdAt), image.uploadedBy ? `${deviceIcon(image.uploadedBy)} ${image.uploadedBy}` : null]
+        .filter(Boolean)
+        .join(' · ');
+      timeEl.title = formatTimestamp(image.createdAt);
       meta.append(filenameEl, detailsEl, timeEl);
+      if (image.pinned) {
+        const pin = document.createElement('span');
+        pin.className = 'badge badge--pin image-card__pin';
+        pin.textContent = '📌 Pinned';
+        card.appendChild(pin);
+      }
       card.appendChild(meta);
 
       li.appendChild(card);
@@ -96,6 +111,7 @@ export function createImagePanel(elements) {
       const actions = document.createElement('div');
       actions.className = 'image-card__actions';
       actions.appendChild(createCardActionButton('Copy', `Copy ${image.originalFilename}`, () => copySelected(image.id)));
+      actions.appendChild(createCardActionButton(textLabel(image), `Show the text in ${image.originalFilename}`, () => onShowText?.(image.id, image.originalFilename)));
       actions.appendChild(createCardActionButton('Download', `Download ${image.originalFilename}`, () => downloadImage(image.id)));
       actions.appendChild(createCardActionButton('Delete', `Delete ${image.originalFilename}`, () => requestDelete(image.id)));
       li.appendChild(actions);
@@ -115,6 +131,24 @@ export function createImagePanel(elements) {
       onClick();
     });
     return button;
+  }
+
+  function textLabel(image) {
+    if (image.textStatus === 'pending') return 'Text…';
+    if (image.textStatus === 'done' && !image.hasText) return 'No text';
+    return 'Text';
+  }
+
+  async function togglePin(id) {
+    const image = images.find((entry) => entry.id === id);
+    if (!image) return;
+    hideInlineMessage(elements.errorMessage);
+    try {
+      await pinImage(id, !image.pinned);
+      announce(image.pinned ? 'Image unpinned' : 'Image pinned: it will not be cleaned up');
+    } catch (error) {
+      showInlineMessage(elements.errorMessage, error instanceof ApiError ? error.message : 'Could not change the pin.');
+    }
   }
 
   function setImages(nextImages, limits) {
@@ -220,6 +254,13 @@ export function createImagePanel(elements) {
   });
   elements.deleteButton.addEventListener('click', () => {
     if (selectedImageId != null) requestDelete(selectedImageId);
+  });
+  elements.textButton.addEventListener('click', () => {
+    const selected = findSelected();
+    if (selected) onShowText?.(selected.id, selected.originalFilename);
+  });
+  elements.pinButton.addEventListener('click', () => {
+    if (selectedImageId != null) togglePin(selectedImageId);
   });
 
   elements.fileInput.addEventListener('change', (event) => {

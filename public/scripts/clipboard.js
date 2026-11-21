@@ -106,3 +106,34 @@ function loadImage(url) {
     image.src = url;
   });
 }
+
+/**
+ * Copies plain text. The Clipboard API only exists on HTTPS (or localhost), so on the
+ * plain-HTTP LAN address this falls back to the older copy command, which still works
+ * there as long as it runs from a click.
+ */
+export async function copyPlainText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return { ok: true };
+    } catch {
+      // Fall through to the legacy path below.
+    }
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.className = 'offscreen-copy';
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, text.length);
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  textarea.remove();
+  return { ok };
+}

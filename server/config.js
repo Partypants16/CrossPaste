@@ -46,6 +46,16 @@ function loadConfig() {
   const optionalAccessToken = process.env.OPTIONAL_ACCESS_TOKEN || '';
   const contentExpiryHours = parseIntEnv('CONTENT_EXPIRY_HOURS', 0, { min: 0, max: 8760 });
 
+  // Text history: unpinned entries past either limit are removed (0 = no limit).
+  const historyMaxItems = parseIntEnv('HISTORY_MAX_ITEMS', 200, { min: 0, max: 100000 });
+  const historyMaxDays = parseIntEnv('HISTORY_MAX_DAYS', 30, { min: 0, max: 3650 });
+  // Saves less than this many seconds apart, from the same device, on the same text,
+  // update one history entry instead of adding a new one for every autosave.
+  const historyMergeSeconds = parseIntEnv('HISTORY_MERGE_SECONDS', 120, { min: 0, max: 86400 });
+
+  // Reading text out of shared images, on this server (1 = on, 0 = off).
+  const ocrEnabled = parseIntEnv('OCR_ENABLED', 1, { min: 0, max: 1 }) === 1;
+
   const logLevel = (process.env.LOG_LEVEL || 'info').toLowerCase();
   const validLogLevels = ['debug', 'info', 'warn', 'error'];
   if (!validLogLevels.includes(logLevel)) {
@@ -86,6 +96,10 @@ function loadConfig() {
     accessTokenEnabled: optionalAccessToken.trim().length > 0,
     contentExpiryHours,
     contentExpiryEnabled: contentExpiryHours > 0,
+    historyMaxItems,
+    historyMaxDays,
+    historyMergeSeconds,
+    ocrEnabled,
     logLevel,
     appVersion: process.env.npm_package_version || '1.0.0',
   };

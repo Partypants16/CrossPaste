@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import multer from 'multer';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -6,6 +6,10 @@ import { config } from '../config.js';
 import { uploadRateLimiter } from '../middleware/rate-limits.js';
 import { broadcast } from '../services/realtime-service.js';
 import { logger } from '../utilities/logger.js';
+import { getDeviceName } from '../utilities/device.js';
+import { validatePinPayload, parseId } from '../middleware/validation.js';
+import { writeRateLimiter } from '../middleware/rate-limits.js';
+import { noCacheForMutableData } from '../middleware/security.js';
 import { deleteFileIfExists } from '../utilities/files.js';
 import {
   storeFile,
@@ -13,6 +17,7 @@ import {
   getFileById,
   getFileRowById,
   deleteFile,
+  setFilePinned,
 } from '../services/file-service.js';
 
 export const filesRouter = Router();
@@ -42,6 +47,7 @@ filesRouter.post('/files', uploadRateLimiter, upload.single('file'), async (req,
       tempPath: req.file.path,
       originalFilename: req.file.originalname,
       mimeType: req.file.mimetype,
+      deviceName: getDeviceName(req),
     });
     broadcast('files-changed', { reason: 'uploaded', fileId: file.id });
     logger.info('File uploaded', { fileId: file.id, mimeType: file.mimeType, sizeBytes: file.sizeBytes });
@@ -79,6 +85,17 @@ filesRouter.delete('/files/:id', async (req, res, next) => {
     broadcast('files-changed', { reason: 'deleted', fileId: result.id });
     logger.info('File deleted', { fileId: result.id });
     res.json({ ok: true, id: result.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+filesRouter.post('/files/:id/pin', express.json({ limit: '2kb' }), writeRateLimiter, noCacheForMutableData, (req, res, next) => {
+  try {
+    const { pinned } = validatePinPayload(req.body);
+    const file = setFilePinned(parseId(req.params.id), pinned);
+    broadcast('files-changed', { reason: pinned ? 'pinned' : 'unpinned', fileId: file.id });
+    res.json({ file });
   } catch (error) {
     next(error);
   }

@@ -8,6 +8,9 @@
   <meta name="robots" content="noindex, nofollow" />
   <meta name="color-scheme" content="light dark" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <meta name="theme-color" content="#2563eb" />
   <link rel="stylesheet" href="/styles/main.css" />
 </head>
 <body>
@@ -31,10 +34,21 @@
       <span class="app-header__updated" id="last-updated">Last updated: —</span>
     </div>
 
-    <button type="button" class="button button--ghost" id="refresh-button" title="Reload the latest saved content">
-      <span aria-hidden="true">⟲</span> Refresh
-    </button>
+    <div class="app-header__actions">
+      <button type="button" class="button button--ghost device-chip" id="device-button" title="The name shown next to what this device shares. Tap to change it.">
+        <span aria-hidden="true" id="device-icon">💻</span>
+        <span class="visually-hidden">This device: </span><span id="device-name">This device</span>
+      </button>
+      <button type="button" class="button" id="history-button" aria-expanded="false" aria-controls="history-drawer" title="Earlier text, and search across text, images and files">
+        <span aria-hidden="true">🕘</span> History
+      </button>
+      <button type="button" class="button button--ghost" id="refresh-button" title="Reload the latest saved content">
+        <span aria-hidden="true">⟲</span> Refresh
+      </button>
+    </div>
   </header>
+
+  <div id="share-message" class="share-message" hidden role="status"></div>
 
   <main class="workspace">
     <section class="panel text-panel" aria-labelledby="text-panel-heading">
@@ -47,6 +61,12 @@
         <button type="button" class="toolbar-button" data-action="copy-text" title="Copy shared text to clipboard" aria-label="Copy text">
           <span aria-hidden="true">⧉</span><span class="toolbar-button__label">Copy</span>
         </button>
+        <button type="button" class="toolbar-button" data-action="copy-plain" title="Copy the text without any formatting" aria-label="Copy as plain text">
+          <span aria-hidden="true">Aa</span><span class="toolbar-button__label">Copy Plain</span>
+        </button>
+        <button type="button" class="toolbar-button" data-action="show-qr" title="Show a QR code to scan with your phone" aria-label="Show QR code">
+          <span aria-hidden="true">▦</span><span class="toolbar-button__label">QR</span>
+        </button>
 
         <span class="toolbar-separator" role="separator" aria-orientation="vertical"></span>
 
@@ -57,10 +77,10 @@
           <em aria-hidden="true">I</em>
         </button>
         <button type="button" class="toolbar-button" data-command="underline" title="Underline (Ctrl+U)" aria-label="Underline">
-          <span aria-hidden="true" style="text-decoration: underline;">U</span>
+          <span aria-hidden="true" class="glyph-underline">U</span>
         </button>
         <button type="button" class="toolbar-button" data-command="strikeThrough" title="Strikethrough" aria-label="Strikethrough">
-          <span aria-hidden="true" style="text-decoration: line-through;">S</span>
+          <span aria-hidden="true" class="glyph-strike">S</span>
         </button>
 
         <span class="toolbar-separator" role="separator" aria-orientation="vertical"></span>
@@ -102,8 +122,11 @@
         spellcheck="true"
       ></div>
 
+      <div id="smart-bar" class="smart-bar" hidden aria-label="Links and colours found in the text"></div>
+
       <div class="editor-footer">
         <span id="char-counter" class="char-counter">0 / 500,000 characters</span>
+        <span id="text-author" class="text-author"></span>
         <div id="limit-warning" class="inline-message inline-message--warning" hidden role="alert"></div>
       </div>
 
@@ -149,6 +172,12 @@
         <button type="button" class="toolbar-button" id="copy-image-button" title="Copy the selected image" aria-label="Copy selected image" disabled>
           <span aria-hidden="true">⧉</span><span class="toolbar-button__label">Copy Selected</span>
         </button>
+        <button type="button" class="toolbar-button" id="image-text-button" title="Show the text in the selected image" aria-label="Show text in selected image" disabled>
+          <span aria-hidden="true">T</span><span class="toolbar-button__label">Text</span>
+        </button>
+        <button type="button" class="toolbar-button" id="pin-image-button" title="Pinned images are never cleaned up" aria-label="Pin selected image" aria-pressed="false" disabled>
+          <span aria-hidden="true">📌</span><span class="toolbar-button__label" id="pin-image-label">Pin</span>
+        </button>
         <button type="button" class="toolbar-button" id="download-image-button" title="Download the selected image" aria-label="Download selected image" disabled>
           <span aria-hidden="true">⬇</span><span class="toolbar-button__label">Download</span>
         </button>
@@ -186,6 +215,9 @@
           <span aria-hidden="true">⬆</span><span class="toolbar-button__label">Upload File</span>
         </label>
         <input type="file" id="file-file-input" hidden aria-label="Choose a file to upload" />
+        <button type="button" class="toolbar-button" id="pin-file-button" title="Pinned files are never cleaned up" aria-label="Pin selected file" aria-pressed="false" disabled>
+          <span aria-hidden="true">📌</span><span class="toolbar-button__label" id="pin-file-label">Pin</span>
+        </button>
         <button type="button" class="toolbar-button" id="download-file-button" title="Download the selected file" aria-label="Download selected file" disabled>
           <span aria-hidden="true">⬇</span><span class="toolbar-button__label">Download</span>
         </button>
@@ -233,6 +265,58 @@
       <button type="button" class="button button--ghost" id="clear-text-cancel">Cancel</button>
     </div>
   </div>
+
+  <div id="qr-panel" class="conflict-panel qr-panel" hidden role="dialog" aria-modal="true" aria-labelledby="qr-title">
+    <h3 id="qr-title">Scan with your phone</h3>
+    <img id="qr-image" class="qr-panel__image" alt="QR code" hidden />
+    <p id="qr-message" class="inline-message inline-message--warning" hidden></p>
+    <p id="qr-caption" class="qr-panel__caption"></p>
+    <div class="conflict-panel__actions">
+      <button type="button" class="button" id="qr-close">Close</button>
+      <button type="button" class="button button--ghost" id="qr-page-button">This Page Instead</button>
+    </div>
+  </div>
+
+  <div id="image-text-panel" class="conflict-panel text-panel-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="image-text-title">
+    <h3 id="image-text-title">Text in image</h3>
+    <p id="image-text-status" class="image-text-status"></p>
+    <textarea id="image-text-output" class="image-text-output" readonly hidden aria-label="Text read from the image"></textarea>
+    <div class="conflict-panel__actions">
+      <button type="button" class="button" id="image-text-copy" disabled>Copy</button>
+      <button type="button" class="button button--secondary" id="image-text-add" disabled>Add to Shared Text</button>
+      <button type="button" class="button button--ghost" id="image-text-retry" hidden>Try Again</button>
+      <button type="button" class="button button--ghost" id="image-text-close">Close</button>
+    </div>
+  </div>
+
+  <div id="device-panel" class="conflict-panel" hidden role="dialog" aria-modal="true" aria-labelledby="device-title">
+    <h3 id="device-title">Name this device</h3>
+    <p>This name appears next to everything this device shares, so you can tell your laptop's pastes from your phone's.</p>
+    <form id="device-form" class="device-form">
+      <label for="device-input" class="visually-hidden">Device name</label>
+      <input id="device-input" class="text-input" maxlength="32" autocomplete="off" required />
+      <div class="conflict-panel__actions">
+        <button type="submit" class="button">Save</button>
+        <button type="button" class="button button--ghost" id="device-cancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="history-overlay" class="drawer-overlay" hidden></div>
+  <aside id="history-drawer" class="drawer" hidden aria-labelledby="history-title">
+    <div class="drawer__header">
+      <h2 id="history-title" class="drawer__title">History</h2>
+      <button type="button" class="button button--ghost" id="history-close" aria-label="Close history">✕</button>
+    </div>
+    <label for="history-search" class="visually-hidden">Search history, images and files</label>
+    <input type="search" id="history-search" class="text-input" placeholder="Search text, images and files…" autocomplete="off" />
+    <div class="drawer__tools">
+      <span id="history-limits" class="drawer__limits"></span>
+      <button type="button" class="button button--ghost button--small" id="history-clear">Clear Unpinned</button>
+    </div>
+    <p id="history-status" class="inline-message" hidden role="status"></p>
+    <div id="history-results" class="drawer__results"></div>
+  </aside>
 
   <div id="modal-backdrop" class="modal-backdrop" hidden></div>
 

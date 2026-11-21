@@ -3,9 +3,11 @@ import {
   uploadFile,
   deleteFileRequest,
   fileDownloadUrl,
+  pinFile,
   ApiError,
 } from './api.js';
-import { showInlineMessage, hideInlineMessage, showPanel, hidePanel, announce } from './ui.js';
+import { showInlineMessage, hideInlineMessage, showPanel, hidePanel, announce, formatRelativeTime } from './ui.js';
+import { deviceIcon } from './device.js';
 
 const IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 // Uploads that finish faster than this never show the progress bar, so small files don't flicker it.
@@ -62,6 +64,9 @@ export function createFilePanel(elements, { onImageFiles, onChanged } = {}) {
     const selected = findSelected();
     elements.downloadButton.disabled = !selected || busy;
     elements.deleteButton.disabled = !selected || busy;
+    elements.pinButton.disabled = !selected;
+    elements.pinButton.setAttribute('aria-pressed', String(Boolean(selected?.pinned)));
+    elements.pinButtonLabel.textContent = selected?.pinned ? 'Unpin' : 'Pin';
   }
 
   function updateCapacity() {
@@ -121,7 +126,21 @@ export function createFilePanel(elements, { onImageFiles, onChanged } = {}) {
       name.title = file.originalFilename;
       const metadata = document.createElement('span');
       metadata.className = 'file-card__metadata';
-      metadata.textContent = `${typeLabel(file.mimeType)} · ${formatBytes(file.sizeBytes)} · ${formatTimestamp(file.createdAt)}`;
+      metadata.textContent = [
+        typeLabel(file.mimeType),
+        formatBytes(file.sizeBytes),
+        formatRelativeTime(file.createdAt),
+        file.uploadedBy ? `${deviceIcon(file.uploadedBy)} ${file.uploadedBy}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      metadata.title = formatTimestamp(file.createdAt);
+      if (file.pinned) {
+        const pin = document.createElement('span');
+        pin.className = 'badge badge--pin';
+        pin.textContent = '📌 Pinned';
+        name.prepend(pin, ' ');
+      }
       details.append(name, metadata);
       selector.append(icon, details);
 
@@ -314,6 +333,18 @@ export function createFilePanel(elements, { onImageFiles, onChanged } = {}) {
     }
   }
 
+  async function togglePin(id) {
+    const file = files.find((entry) => entry.id === id);
+    if (!file) return;
+    try {
+      await pinFile(id, !file.pinned);
+      announce(file.pinned ? 'File unpinned' : 'File pinned: it will not be cleaned up');
+    } catch (error) {
+      showInlineMessage(elements.errorMessage, error instanceof ApiError ? error.message : 'Could not change the pin.');
+    }
+  }
+
+  elements.pinButton.addEventListener('click', () => selectedFileId != null && togglePin(selectedFileId));
   elements.downloadButton.addEventListener('click', () => selectedFileId != null && download(selectedFileId));
   elements.deleteButton.addEventListener('click', () => selectedFileId != null && requestDelete(selectedFileId));
   elements.deleteConfirmButton.addEventListener('click', confirmDelete);

@@ -46,7 +46,7 @@ function countFiles(db) {
  * HTTP uploads arrive, so large files never sit in memory). A `tempPath` is moved into
  * the files directory on success; on failure the caller still owns it and must delete it.
  */
-export async function storeFile({ buffer, tempPath, originalFilename, mimeType: declaredMimeType }) {
+export async function storeFile({ buffer, tempPath, originalFilename, mimeType: declaredMimeType, deviceName = null }) {
   const sizeBytes = buffer ? buffer.length : (await fs.stat(tempPath)).size;
   if (sizeBytes > config.fileSizeLimitBytes) {
     throw new FileTooLargeError(sizeBytes);
@@ -78,8 +78,8 @@ export async function storeFile({ buffer, tempPath, originalFilename, mimeType: 
     const result = db
       .prepare(
         `INSERT INTO files
-          (stored_filename, original_filename, mime_type, size_bytes, sort_order, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
+          (stored_filename, original_filename, mime_type, size_bytes, sort_order, created_at, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         storedFilename,
@@ -87,7 +87,8 @@ export async function storeFile({ buffer, tempPath, originalFilename, mimeType: 
         mimeType,
         sizeBytes,
         nextSortOrder,
-        timestamp
+        timestamp,
+        deviceName
       );
     return result.lastInsertRowid;
   });
@@ -165,7 +166,7 @@ export function getRemainingCapacity() {
 
 export async function expireOldFiles(cutoffIso) {
   const db = getDatabase();
-  const expired = db.prepare('SELECT * FROM files WHERE created_at < ?').all(cutoffIso);
+  const expired = db.prepare('SELECT * FROM files WHERE created_at < ? AND pinned = 0').all(cutoffIso);
   if (expired.length === 0) return 0;
 
   const deletedIds = [];
@@ -196,5 +197,14 @@ function toPublicShape(row) {
     sizeBytes: row.size_bytes,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
+    uploadedBy: row.uploaded_by ?? null,
+    pinned: row.pinned === 1,
   };
+}
+
+export function setFilePinned(id, pinned) {
+  const db = getDatabase();
+  const result = db.prepare('UPDATE files SET pinned = ? WHERE id = ?').run(pinned ? 1 : 0, id);
+  if (result.changes === 0) throw new FileNotFoundError();
+  return getFileById(id);
 }
